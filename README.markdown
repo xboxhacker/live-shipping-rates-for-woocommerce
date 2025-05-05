@@ -1,10 +1,5 @@
 # Live Shipping Rates for WooCommerce
-
-**Plugin Name**: Live Shipping Rates for WooCommerce  
-**Description**: Integrates UPS and USPS live shipping rates into WooCommerce using OAuth 2.0 authentication, with GUI debugging and live rate testing capabilities.  
-**Version**: 1.1.13  
-**Author**: William Hare & Grok3.0  
-**License**: GPL2  
+ 
 
 ## Overview
 
