@@ -61,10 +61,18 @@ if ( ! class_exists( 'LSRWC_UPS_Shipping_Method' ) ) {
     class LSRWC_UPS_Shipping_Method extends LSRWC_Shipping_Method {
         public function __construct( $instance_id = 0 ) {
             $this->id = 'lsrwc_ups';
+            $this->carrier = 'ups';
             $this->method_title = 'UPS Live Rates (Ground)';
             $this->method_description = 'Fetches live UPS Ground shipping rates.';
-            $this->carrier = 'ups';
             parent::__construct( $instance_id );
+        }
+
+        public function init() {
+            parent::init();
+        }
+
+        public function get_method_title() {
+            return $this->method_title ?: 'UPS Live Rates (Ground)';
         }
 
         protected function fetch_shipping_rates( $package ) {
@@ -113,10 +121,18 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
     class LSRWC_USPS_Shipping_Method extends LSRWC_Shipping_Method {
         public function __construct( $instance_id = 0 ) {
             $this->id = 'lsrwc_usps';
+            $this->carrier = 'usps';
             $this->method_title = 'USPS Live Rates (Ground Advantage)';
             $this->method_description = 'Fetches live USPS Ground Advantage shipping rates.';
-            $this->carrier = 'usps';
             parent::__construct( $instance_id );
+        }
+
+        public function init() {
+            parent::init();
+        }
+
+        public function get_method_title() {
+            return $this->method_title ?: 'USPS Live Rates (Ground Advantage)';
         }
 
         protected function fetch_shipping_rates( $package ) {
