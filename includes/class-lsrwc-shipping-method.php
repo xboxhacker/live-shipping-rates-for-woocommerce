@@ -64,6 +64,7 @@ if ( ! class_exists( 'LSRWC_UPS_Shipping_Method' ) ) {
             $this->carrier = 'ups';
             $this->method_title = 'UPS Live Rates (Ground)';
             $this->method_description = 'Fetches live UPS Ground shipping rates.';
+            $this->title = $this->method_title; // <-- Fix: set title property
             parent::__construct( $instance_id );
         }
 
@@ -125,6 +126,7 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
             $this->carrier = 'usps';
             $this->method_title = 'USPS Live Rates (Ground Advantage)';
             $this->method_description = 'Fetches live USPS Ground Advantage shipping rates.';
+            $this->title = $this->method_title; // <-- Fix: set title property
             parent::__construct( $instance_id );
         }
 
@@ -179,6 +181,7 @@ if ( ! class_exists( 'LSRWC_UPS_International_Shipping_Method' ) ) {
             $this->carrier = 'ups';
             $this->method_title = 'UPS Live Rates (International)';
             $this->method_description = 'Fetches live UPS Standard shipping rates for international destinations.';
+            $this->title = $this->method_title; // <-- Fix: set title property
             parent::__construct( $instance_id );
         }
 
