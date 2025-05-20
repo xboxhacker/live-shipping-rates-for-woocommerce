@@ -22,7 +22,7 @@ if ( ! class_exists( 'LSRWC_Shipping_Method' ) ) {
             $rates = $this->fetch_shipping_rates( $package );
             foreach ( $rates as $rate ) {
                 $cost = $rate['cost'];
-                $percentage = $this->carrier === 'ups' ? ( $settings['ups_percentage'] ?? 0 ) : ( $settings['usps_percentage'] ?? 0 );
+                $percentage = $this->carrier === 'ups' ? ($this->id === 'lsrwc_ups_international' ? ($settings['ups_international_percentage'] ?? 0) : ($settings['ups_percentage'] ?? 0)) : ($settings['usps_percentage'] ?? 0);
                 $cost = $cost * ( 1 + $percentage / 100 );
                 $this->add_rate( array(
                     'id' => $this->id . '_' . $rate['id'],
@@ -72,13 +72,13 @@ if ( ! class_exists( 'LSRWC_UPS_Shipping_Method' ) ) {
         }
 
         public function get_method_title() {
-            return $this->method_title ?: 'UPS Live Rates (Ground)';
+            return 'UPS Live Rates (Ground)';
         }
 
         protected function fetch_shipping_rates( $package ) {
             $token = lsrwc_get_ups_access_token();
             if ( ! $token ) {
-                lsrwc_log( 'Failed to get UPS access token.', true );
+                lsrwc_log( 'Failed to get UPS access token.' );
                 return array();
             }
 
@@ -90,25 +90,26 @@ if ( ! class_exists( 'LSRWC_UPS_Shipping_Method' ) ) {
             $city = $package['destination']['city'] ?? '';
             $state = $package['destination']['state'] ?? '';
             $zip = $package['destination']['postcode'] ?? '';
+            $country = $package['destination']['country'] ?? 'US';
 
             // Validate weight
             if ( $weight <= 0 ) {
                 $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
                 $debug_info['ups_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
                 set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-                lsrwc_log( 'UPS rate request skipped: Invalid package weight.', true );
+                lsrwc_log( 'UPS rate request skipped: Invalid package weight.' );
                 return array();
             }
 
-            // Call the UPS rate fetching function with aggregated weight
-            $rates = lsrwc_fetch_ups_rates( $city, $state, $zip, $weight, $length, $width, $height );
+            // Call the UPS rate fetching function with aggregated weight and service code '03' (Ground)
+            $rates = lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length, $width, $height, '03' );
 
             $formatted_rates = array();
             foreach ( $rates as $service => $cost ) {
                 $formatted_rates[] = array(
                     'id' => sanitize_title( $service ),
                     'label' => $service,
-                    'cost' => floatval( str_replace( '$', '', $cost ) )
+                    'cost' => floatval( str_replace( '$', '', $cost['adjusted'] ) )
                 );
             }
 
@@ -132,7 +133,7 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
         }
 
         public function get_method_title() {
-            return $this->method_title ?: 'USPS Live Rates (Ground Advantage)';
+            return 'USPS Live Rates (Ground Advantage)';
         }
 
         protected function fetch_shipping_rates( $package ) {
@@ -150,7 +151,7 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
                 $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
                 $debug_info['usps_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
                 set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-                lsrwc_log( 'USPS rate request skipped: Invalid package weight.', true );
+                lsrwc_log( 'USPS rate request skipped: Invalid package weight.' );
                 return array();
             }
 
@@ -162,7 +163,68 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
                 $formatted_rates[] = array(
                     'id' => sanitize_title( $service ),
                     'label' => $service,
-                    'cost' => floatval( str_replace( '$', '', $cost ) )
+                    'cost' => floatval( str_replace( '$', '', $cost['adjusted'] ) )
+                );
+            }
+
+            return $formatted_rates;
+        }
+    }
+}
+
+if ( ! class_exists( 'LSRWC_UPS_International_Shipping_Method' ) ) {
+    class LSRWC_UPS_International_Shipping_Method extends LSRWC_Shipping_Method {
+        public function __construct( $instance_id = 0 ) {
+            $this->id = 'lsrwc_ups_international';
+            $this->carrier = 'ups';
+            $this->method_title = 'UPS Live Rates (International)';
+            $this->method_description = 'Fetches live UPS Standard shipping rates for international destinations.';
+            parent::__construct( $instance_id );
+        }
+
+        public function init() {
+            parent::init();
+        }
+
+        public function get_method_title() {
+            return 'UPS Live Rates (International)';
+        }
+
+        protected function fetch_shipping_rates( $package ) {
+            $token = lsrwc_get_ups_access_token();
+            if ( ! $token ) {
+                lsrwc_log( 'Failed to get UPS access token.' );
+                return array();
+            }
+
+            $settings = get_option( 'lsrwc_settings', array() );
+            $weight = $this->get_package_weight( $package );
+            $length = $this->get_package_dimension( $package, 'length' );
+            $width = $this->get_package_dimension( $package, 'width' );
+            $height = $this->get_package_dimension( $package, 'height' );
+            $city = $package['destination']['city'] ?? '';
+            $state = $package['destination']['state'] ?? '';
+            $zip = $package['destination']['postcode'] ?? '';
+            $country = $package['destination']['country'] ?? 'CA';
+
+            // Validate weight
+            if ( $weight <= 0 ) {
+                $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+                $debug_info['ups_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
+                set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+                lsrwc_log( 'UPS rate request skipped: Invalid package weight.' );
+                return array();
+            }
+
+            // Call the UPS rate fetching function with aggregated weight and service code '11' (Standard)
+            $rates = lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length, $width, $height, '11' );
+
+            $formatted_rates = array();
+            foreach ( $rates as $service => $cost ) {
+                $formatted_rates[] = array(
+                    'id' => sanitize_title( $service ),
+                    'label' => $service,
+                    'cost' => floatval( str_replace( '$', '', $cost['adjusted'] ) )
                 );
             }
 
