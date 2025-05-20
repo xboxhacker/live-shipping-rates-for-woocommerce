@@ -14,6 +14,7 @@ jQuery(document).ready(function($) {
                 city: $form.find('#city').val(),
                 state: $form.find('#state').val(),
                 zip: $form.find('#zip').val(),
+                country: $form.find('#country').val(),
                 weight: $form.find('#weight').val(),
                 length: $form.find('#length').val(),
                 width: $form.find('#width').val(),
