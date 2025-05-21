@@ -5,6 +5,8 @@
 
 The Live Shipping Rates for WooCommerce plugin allows online stores to fetch real-time shipping rates from UPS and USPS directly within the WooCommerce cart and checkout pages. It supports OAuth 2.0 authentication for secure API access, includes a user-friendly admin interface for testing rates, and provides extensive debugging tools. The plugin also features conditional logic to display shipping methods based on cart contents, ensuring a seamless customer experience.
 
+I used this for integration with Veeqo shipping. This plugin gets the rates, then orders are sent to Veeqo, with shipping rates, for shipment.
+
 ## Features
 
 - **Real-Time Rates**: Fetches live shipping rates from UPS (Ground) and USPS (Ground Advantage) using their respective APIs.
@@ -45,7 +47,7 @@ The Live Shipping Rates for WooCommerce plugin allows online stores to fetch rea
 2. Configure the following fields:
    - **UPS Client ID**, **UPS Client Secret**, **UPS Account Number**: Obtain from the UPS Developer Portal.
    - **USPS Consumer Key**, **USPS Consumer Secret**: Obtain from the USPS Shipping API portal.
-   - **Origin ZIP Code**, **Origin City**, **Origin State**, **Origin Address Line 1**: Set your store’s shipping origin details (e.g., `33905`, `Fort Myers`, `FL`, `1681 Benchmark Ave`).
+   - **Origin ZIP Code**, **Origin City**, **Origin State**, **Origin Address Line 1**: Set your store’s shipping origin details (e.g., `33915`, `ANY TOWN`, `FL`, `555 Main St.`).
    - **UPS/USPS Percentage Increase (%)**: Optional markup for shipping rates.
    - **UPS Shipping Class Slug**, **USPS Shipping Class Slug**: Match the slugs defined in WooCommerce (e.g., `ups-shipping`, `usps-shipping`).
    - **Enable Extensive Debugging**: Check to log detailed API requests/responses.
