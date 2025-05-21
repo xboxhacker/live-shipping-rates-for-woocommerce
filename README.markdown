@@ -82,7 +82,7 @@ The plugin integrates with WooCommerce’s shipping zones to control where and h
 
 ### Testing Live Rates
 1. Go to **Live Shipping Rates > Test Live Rates** in the admin panel.
-2. Enter test inputs (e.g., City: `North Fort Myers`, State: `FL`, ZIP: `33917`, Weight: `12`, Length: `12`, Width: `12`, Height: `12`).
+2. Enter test inputs (e.g., City: `ANY TOWN`, State: `FL`, ZIP: `33915`, Weight: `12`, Length: `12`, Width: `12`, Height: `12`).
 3. Click **Get Rates** to view UPS and USPS rates.
 4. Check the **Debug Information** section in **Settings** for API request/response logs.
 
