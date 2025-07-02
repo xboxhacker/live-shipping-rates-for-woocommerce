@@ -634,7 +634,7 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         'mailClass' => 'USPS_GROUND_ADVANTAGE',
         'processingCategory' => 'MACHINABLE',
         'destinationEntryFacilityType' => 'NONE',
-        'rateIndicator' => 'DR',
+        'rateIndicator' => 'SP',
         'priceType' => 'COMMERCIAL',
     );
 
