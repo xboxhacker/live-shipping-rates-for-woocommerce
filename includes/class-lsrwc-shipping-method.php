@@ -21,6 +21,15 @@ if ( ! class_exists( 'LSRWC_Shipping_Method' ) ) {
             $settings = get_option( 'lsrwc_settings', array() );
             $debug_mode = $settings['debug_mode'] ?? 0;
             $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+            $has_chargeable_items = lsrwc_package_has_chargeable_items( $package );
+            if ( ! $has_chargeable_items ) {
+                if ( $debug_mode && lsrwc_package_has_free_shipping_class( $package ) ) {
+                    $debug_info['free_shipping_class_match'] = 'Only free-shipping items detected. Carrier ' . $this->carrier . ' skipped.';
+                    set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+                    lsrwc_log( 'Only free-shipping items in cart; skipping carrier ' . $this->carrier, 'INFO' );
+                }
+                return;
+            }
             $rates = $this->fetch_shipping_rates( $package );
             if ( $debug_mode ) {
                 $debug_info['calculate_shipping_rates'] = "Carrier: {$this->carrier}, Rates: " . print_r( $rates, true );
@@ -43,9 +52,13 @@ if ( ! class_exists( 'LSRWC_Shipping_Method' ) ) {
             $settings = get_option( 'lsrwc_settings', array() );
             $debug_mode = $settings['debug_mode'] ?? 0;
             $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+            $free_slug = $settings['free_shipping_class_slug'] ?? '';
             $total_weight = 0;
             foreach ( $package['contents'] as $item ) {
                 $product = $item['data'];
+                if ( $free_slug && method_exists( $product, 'get_shipping_class' ) && $product->get_shipping_class() === $free_slug ) {
+                    continue;
+                }
                 $weight = $product->get_weight() ? floatval( $product->get_weight() ) : 0;
                 $quantity = isset( $item['quantity'] ) ? max( 1, intval( $item['quantity'] ) ) : 1;
                 $total_weight += $weight * $quantity;
@@ -67,9 +80,13 @@ if ( ! class_exists( 'LSRWC_Shipping_Method' ) ) {
             $settings = get_option( 'lsrwc_settings', array() );
             $debug_mode = $settings['debug_mode'] ?? 0;
             $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+            $free_slug = $settings['free_shipping_class_slug'] ?? '';
             $max_dimension = 0;
             foreach ( $package['contents'] as $item ) {
                 $product = $item['data'];
+                if ( $free_slug && method_exists( $product, 'get_shipping_class' ) && $product->get_shipping_class() === $free_slug ) {
+                    continue;
+                }
                 $dim_value = $product->get_data()[$dimension] ? floatval( $product->get_data()[$dimension] ) : 0;
                 $quantity = isset( $item['quantity'] ) ? max( 1, intval( $item['quantity'] ) ) : 1;
                 // Use the maximum dimension across all items, adjusted for quantity
@@ -116,7 +133,7 @@ if ( ! class_exists( 'LSRWC_UPS_Shipping_Method' ) ) {
             $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
             $token = lsrwc_get_ups_access_token();
             if ( ! $token ) {
-                lsrwc_log( 'Failed to get UPS access token.' );
+                lsrwc_log( 'Failed to get UPS access token.', 'ERROR' );
                 return array();
             }
 
@@ -134,7 +151,7 @@ if ( ! class_exists( 'LSRWC_UPS_Shipping_Method' ) ) {
                 if ( $debug_mode ) {
                     $debug_info['ups_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
                     set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-                    lsrwc_log( 'UPS rate request skipped: Invalid package weight.' );
+                    lsrwc_log( 'UPS rate request skipped: Invalid package weight.', 'WARNING' );
                 }
                 return array();
             }
@@ -198,8 +215,9 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
                 if ( $debug_mode ) {
                     $debug_info['usps_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
                     set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-                    lsrwc_log( 'USPS rate request skipped: Invalid package weight.' );
+                    lsrwc_log( 'USPS rate request skipped: Invalid package weight.', 'WARNING' );
                 }
+                lsrwc_set_last_notice( 'usps_rates_last_notice', 'Invalid package weight (product weight missing or zero).' );
                 return array();
             }
 
@@ -251,7 +269,7 @@ if ( ! class_exists( 'LSRWC_UPS_International_Shipping_Method' ) ) {
             $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
             $token = lsrwc_get_ups_access_token();
             if ( ! $token ) {
-                lsrwc_log( 'Failed to get UPS access token.' );
+                lsrwc_log( 'Failed to get UPS access token.', 'ERROR' );
                 return array();
             }
 
@@ -269,7 +287,7 @@ if ( ! class_exists( 'LSRWC_UPS_International_Shipping_Method' ) ) {
                 if ( $debug_mode ) {
                     $debug_info['ups_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
                     set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-                    lsrwc_log( 'UPS rate request skipped: Invalid package weight.' );
+                    lsrwc_log( 'UPS rate request skipped: Invalid package weight.', 'WARNING' );
                 }
                 return array();
             }

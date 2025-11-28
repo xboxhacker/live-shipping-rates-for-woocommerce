@@ -78,6 +78,7 @@ function lsrwc_register_settings() {
     add_settings_field( 'usps_percentage', 'USPS Percentage Increase (%)', 'lsrwc_usps_percentage_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'ups_shipping_class_slug', 'UPS Shipping Class Slug', 'lsrwc_ups_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'usps_shipping_class_slug', 'USPS Shipping Class Slug', 'lsrwc_usps_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'free_shipping_class_slug', 'Free Shipping Class Slug', 'lsrwc_free_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'debug_mode', 'Enable Extensive Debugging', 'lsrwc_debug_mode_field', 'live-shipping-rates', 'lsrwc_main_section' );
 }
 
@@ -98,6 +99,7 @@ function lsrwc_sanitize_settings( $input ) {
     $sanitized['usps_percentage'] = floatval( $input['usps_percentage'] ?? 0 );
     $sanitized['ups_shipping_class_slug'] = sanitize_text_field( $input['ups_shipping_class_slug'] ?? '' );
     $sanitized['usps_shipping_class_slug'] = sanitize_text_field( $input['usps_shipping_class_slug'] ?? '' );
+    $sanitized['free_shipping_class_slug'] = sanitize_text_field( $input['free_shipping_class_slug'] ?? '' );
     $sanitized['debug_mode'] = isset( $input['debug_mode'] ) ? 1 : 0;
     return $sanitized;
 }
@@ -264,6 +266,13 @@ function lsrwc_usps_shipping_class_slug_field() {
     echo "<input type='text' name='lsrwc_settings[usps_shipping_class_slug]' value='" . esc_attr( $value ) . "' class='regular-text' placeholder='e.g., usps-shipping'>";
 }
 
+function lsrwc_free_shipping_class_slug_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $value = $settings['free_shipping_class_slug'] ?? '';
+    echo "<input type='text' name='lsrwc_settings[free_shipping_class_slug]' value='" . esc_attr( $value ) . "' class='regular-text' placeholder='e.g., free-shipping'>";
+    echo '<p class="description">If any item in the cart uses this shipping class, all shipping will be offered for free and carrier API calls will be skipped.</p>';
+}
+
 function lsrwc_debug_mode_field() {
     $settings = get_option( 'lsrwc_settings', array() );
     $checked = isset( $settings['debug_mode'] ) && $settings['debug_mode'] ? 'checked' : '';
@@ -292,7 +301,7 @@ function lsrwc_get_ups_access_token() {
         if ( $debug_mode ) {
             $debug_info['ups_token_error'] = 'UPS credentials missing. Please check Client ID and Client Secret in settings.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS token request failed: Missing Client ID or Client Secret.' );
+            lsrwc_log( 'UPS token request failed: Missing Client ID or Client Secret.', 'ERROR' );
         }
         return false;
     }
@@ -319,7 +328,7 @@ function lsrwc_get_ups_access_token() {
         if ( $debug_mode ) {
             $debug_info['ups_token_error'] = 'UPS token request failed: ' . $response->get_error_message();
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS token request failed: ' . $response->get_error_message() );
+            lsrwc_log( 'UPS token request failed: ' . $response->get_error_message(), 'ERROR' );
         }
         return false;
     }
@@ -335,7 +344,7 @@ function lsrwc_get_ups_access_token() {
         if ( $debug_mode ) {
             $debug_info['ups_token_error'] = 'UPS token request failed with status ' . $response_code . ': ' . $error_message;
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS token request failed: ' . $error_message );
+            lsrwc_log( 'UPS token request failed: ' . $error_message, 'ERROR' );
         }
         return false;
     }
@@ -352,7 +361,7 @@ function lsrwc_get_ups_access_token() {
         if ( $debug_mode ) {
             $debug_info['ups_token_error'] = 'UPS token not found in response.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS token not found in response.' );
+            lsrwc_log( 'UPS token not found in response.', 'ERROR' );
         }
     }
     return $token;
@@ -379,7 +388,7 @@ function lsrwc_get_usps_access_token() {
         if ( $debug_mode ) {
             $debug_info['usps_token_error'] = 'USPS credentials missing. Please check Consumer Key and Consumer Secret in settings.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'USPS token request failed: Missing Consumer Key or Consumer Secret.' );
+            lsrwc_log( 'USPS token request failed: Missing Consumer Key or Consumer Secret.', 'ERROR' );
         }
         return false;
     }
@@ -407,7 +416,7 @@ function lsrwc_get_usps_access_token() {
         if ( $debug_mode ) {
             $debug_info['usps_token_error'] = 'USPS token request failed: ' . $response->get_error_message();
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'USPS token request failed: ' . $response->get_error_message() );
+            lsrwc_log( 'USPS token request failed: ' . $response->get_error_message(), 'ERROR' );
         }
         return false;
     }
@@ -423,7 +432,7 @@ function lsrwc_get_usps_access_token() {
         if ( $debug_mode ) {
             $debug_info['usps_token_error'] = 'USPS token request failed with status ' . $response_code . ': ' . $error_message;
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'USPS token request failed: ' . $error_message );
+            lsrwc_log( 'USPS token request failed: ' . $error_message, 'ERROR' );
         }
         return false;
     }
@@ -440,7 +449,7 @@ function lsrwc_get_usps_access_token() {
         if ( $debug_mode ) {
             $debug_info['usps_token_error'] = 'USPS token not found in response.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'USPS token not found in response.' );
+            lsrwc_log( 'USPS token not found in response.', 'ERROR' );
         }
     }
     return $token;
@@ -451,7 +460,7 @@ function lsrwc_test_rates_ajax() {
     check_ajax_referer( 'lsrwc_nonce', 'nonce' );
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( 'Unauthorized access.' );
-        lsrwc_log( 'Test rates failed: Unauthorized access.' );
+        lsrwc_log( 'Test rates failed: Unauthorized access.', 'ERROR' );
         return;
     }
 
@@ -479,7 +488,7 @@ function lsrwc_test_rates_ajax() {
         if ( $debug_mode ) {
             $debug_info['test_rates_error'] = $error_message;
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( "Test rates failed: $error_message" );
+            lsrwc_log( "Test rates failed: $error_message", 'ERROR' );
         }
         wp_send_json_error( $error_message );
         return;
@@ -500,6 +509,10 @@ function lsrwc_test_rates_ajax() {
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
         lsrwc_log( "Test rates result: " . $debug_info['test_rates_result'] );
     }
+
+    // Refresh debug info to include any notices recorded during rate calls.
+    $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+    $usps_notice = $debug_info['usps_rates_last_notice'] ?? '';
 
     ob_start();
     echo '<h3>Live Shipping Rates</h3>';
@@ -532,7 +545,21 @@ function lsrwc_test_rates_ajax() {
         }
         echo '</table>';
     } elseif ( $country !== 'CA' ) {
-        echo '<p class="lsrwc-error">No USPS rates available. Check debug information.</p>';
+        $reason_suffix = $usps_notice ? ' Reason: ' . esc_html( $usps_notice ) : '';
+        echo '<p class="lsrwc-error">No USPS rates available. Check debug information.' . $reason_suffix . '</p>';
+        lsrwc_log(
+            'Test Rates: USPS rates not returned for manual request.',
+            'WARNING',
+            array(
+                'city' => $city,
+                'state' => $state,
+                'zip' => $zip,
+                'country' => $country,
+                'weight' => $weight,
+                'dimensions' => compact( 'length', 'width', 'height' ),
+                'notice' => $usps_notice
+            )
+        );
     }
     $html = ob_get_clean();
 
@@ -549,7 +576,7 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
         if ( $debug_mode ) {
             $debug_info['ups_rates_error'] = 'Failed to get UPS access token for rates.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS rate request failed: No token.' );
+            lsrwc_log( 'UPS rate request failed: No token.', 'ERROR' );
         }
         return array();
     }
@@ -559,7 +586,7 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
         if ( $debug_mode ) {
             $debug_info['ups_rates_error'] = 'Invalid package weight: Weight must be greater than zero.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS rate request skipped: Invalid package weight.' );
+            lsrwc_log( 'UPS rate request skipped: Invalid package weight.', 'WARNING' );
         }
         return array();
     }
@@ -662,7 +689,7 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
         if ( $debug_mode ) {
             $debug_info['ups_rates_error'] = 'UPS rates fetch failed: ' . $response->get_error_message();
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'UPS rates fetch failed: ' . $response->get_error_message() );
+            lsrwc_log( 'UPS rates fetch failed: ' . $response->get_error_message(), 'ERROR' );
         }
         return array();
     }
@@ -680,7 +707,7 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
         if ( $debug_mode ) {
             $debug_info['ups_rates_error'] = "UPS API error: $error_message";
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( "UPS API error: $error_message" );
+            lsrwc_log( "UPS API error: $error_message", 'ERROR' );
         }
         return array();
     }
@@ -706,11 +733,63 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
         if ( $debug_mode ) {
             $debug_info['ups_rates_error'] = 'No rates found in UPS response.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'No rates found in UPS response.' );
+            lsrwc_log( 'No rates found in UPS response.', 'WARNING' );
         }
     }
 
     return $rates;
+}
+
+function lsrwc_normalize_dimensions( $length, $width, $height ) {
+    $dimensions = array(
+        max( 0, floatval( $length ) ),
+        max( 0, floatval( $width ) ),
+        max( 0, floatval( $height ) )
+    );
+    rsort( $dimensions, SORT_NUMERIC );
+    return array(
+        'length' => $dimensions[0] ?? 0,
+        'width' => $dimensions[1] ?? 0,
+        'height' => $dimensions[2] ?? 0,
+    );
+}
+
+function lsrwc_get_usps_processing_category( $weight, $length, $width, $height ) {
+    // USPS machinable parcels max out at 22" x 18" x 15" and 25 lbs (QSG 201e / Domestic Label API sheet).
+    $category = 'MACHINABLE';
+    $reasons = array();
+
+    if ( $weight > 25 ) {
+        $category = 'NONSTANDARD';
+        $reasons[] = 'Weight exceeds 25 lb machinable limit';
+    }
+
+    if ( $length > 22 ) {
+        $category = 'NONSTANDARD';
+        $reasons[] = 'Length exceeds 22 inches machinable limit';
+    }
+
+    if ( $width > 18 ) {
+        $category = 'NONSTANDARD';
+        $reasons[] = 'Width exceeds 18 inches machinable limit';
+    }
+
+    if ( $height > 15 ) {
+        $category = 'NONSTANDARD';
+        $reasons[] = 'Height exceeds 15 inches machinable limit';
+    }
+
+    $length_plus_girth = $length + 2 * ( $width + $height );
+    if ( $length_plus_girth > 108 ) {
+        $category = 'NONSTANDARD';
+        $reasons[] = 'Length plus girth exceeds 108 inches machinable limit';
+    }
+
+    return array(
+        'category' => $category,
+        'reasons' => $reasons,
+        'length_plus_girth' => $length_plus_girth,
+    );
 }
 
 // Fetch USPS rates
@@ -723,10 +802,19 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         if ( $debug_mode ) {
             $debug_info['usps_rates_error'] = 'Failed to get USPS access token for rates.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'USPS rates fetch failed: No token.' );
+            lsrwc_log( 'USPS rates fetch failed: No token.', 'ERROR' );
         }
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'Failed to get USPS access token.' );
         return array();
     }
+
+    $normalized_dimensions = lsrwc_normalize_dimensions( $length, $width, $height );
+    $length = $normalized_dimensions['length'];
+    $width = $normalized_dimensions['width'];
+    $height = $normalized_dimensions['height'];
+
+    $processing_category_data = lsrwc_get_usps_processing_category( $weight, $length, $width, $height );
+    $processing_category = $processing_category_data['category'];
 
     $url = 'https://apis.usps.com/prices/v3/base-rates/search';
     $body = array(
@@ -737,7 +825,7 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         'width' => $width,
         'height' => $height,
         'mailClass' => 'USPS_GROUND_ADVANTAGE',
-        'processingCategory' => 'MACHINABLE',
+        'processingCategory' => $processing_category,
         'destinationEntryFacilityType' => 'NONE',
         'rateIndicator' => 'DR',
         'priceType' => 'COMMERCIAL',
@@ -753,6 +841,8 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
     );
 
     if ( $debug_mode ) {
+        $category_note = empty( $processing_category_data['reasons'] ) ? 'Package within machinable thresholds.' : 'Reasons: ' . implode( '; ', $processing_category_data['reasons'] );
+        $debug_info['usps_processing_category'] = "Processing category: $processing_category. $category_note Length+Girth: " . number_format( $processing_category_data['length_plus_girth'], 2 );
         $debug_info['usps_rate_request'] = "USPS rate request URL: $url\nBody: " . print_r( $body, true );
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
         lsrwc_log( "USPS rate request: URL=$url, Body=" . print_r( $body, true ) );
@@ -763,8 +853,9 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         if ( $debug_mode ) {
             $debug_info['usps_rates_error'] = 'USPS rates fetch failed: ' . $response->get_error_message();
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'USPS rates fetch failed: ' . $response->get_error_message() );
+            lsrwc_log( 'USPS rates fetch failed: ' . $response->get_error_message(), 'ERROR' );
         }
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS request error: ' . $response->get_error_message() );
         return array();
     }
 
@@ -781,8 +872,9 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         if ( $debug_mode ) {
             $debug_info['usps_rates_error'] = "USPS API error: $error_message";
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( "USPS API error: $error_message" );
+            lsrwc_log( "USPS API error: $error_message", 'ERROR' );
         }
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS API error: ' . $error_message );
         return array();
     }
 
@@ -806,8 +898,11 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         if ( $debug_mode ) {
             $debug_info['usps_rates_error'] = 'No rate found in USPS response (totalBasePrice missing).';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'No rate found in USPS response (totalBasePrice missing).' );
+            lsrwc_log( 'No rate found in USPS response (totalBasePrice missing).', 'WARNING' );
         }
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS response did not include totalBasePrice for Ground Advantage.' );
+    } else {
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS returned ' . count( $rates ) . ' rate(s).' );
     }
 
     return $rates;
@@ -818,7 +913,7 @@ function lsrwc_clear_debug_ajax() {
     check_ajax_referer( 'lsrwc_nonce', 'nonce' );
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( 'Unauthorized access.' );
-        lsrwc_log( 'Clear debug failed: Unauthorized access.' );
+        lsrwc_log( 'Clear debug failed: Unauthorized access.', 'ERROR' );
         return;
     }
     delete_transient( 'lsrwc_ups_access_token' );
@@ -833,16 +928,72 @@ function lsrwc_clear_debug_ajax() {
 }
 
 // Logging function
-function lsrwc_log( $message ) {
+function lsrwc_log( $message, $level = 'INFO', $context = array() ) {
     $settings = get_option( 'lsrwc_settings', array() );
     $debug_mode = $settings['debug_mode'] ?? 0;
     if ( $debug_mode ) {
         $log_file = plugin_dir_path( __FILE__ ) . 'lsrwc_debug.log';
         $timestamp = gmdate( 'Y-m-d H:i:s' );
-        $log_message = "[$timestamp] [LSRWC] $message\n";
+        $level = strtoupper( $level );
+        $context_string = '';
+        if ( ! empty( $context ) ) {
+            $encoded_context = wp_json_encode( $context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+            if ( $encoded_context ) {
+                $context_string = ' ' . $encoded_context;
+            }
+        }
+        $log_message = "[$timestamp] [LSRWC][$level] $message$context_string\n";
         error_log( $log_message );
         file_put_contents( $log_file, $log_message, FILE_APPEND );
     }
+}
+
+function lsrwc_set_last_notice( $key, $message ) {
+    $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+    $debug_info[$key] = $message;
+    set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+}
+
+function lsrwc_get_free_shipping_class_slug() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    return $settings['free_shipping_class_slug'] ?? '';
+}
+
+function lsrwc_package_has_free_shipping_class( $package ) {
+    if ( empty( $package['contents'] ) ) {
+        return false;
+    }
+    $slug = lsrwc_get_free_shipping_class_slug();
+    if ( empty( $slug ) ) {
+        return false;
+    }
+    foreach ( $package['contents'] as $item ) {
+        $product = $item['data'] ?? null;
+        if ( ! $product || ! method_exists( $product, 'get_shipping_class' ) ) {
+            continue;
+        }
+        if ( $product->get_shipping_class() === $slug ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function lsrwc_package_has_chargeable_items( $package ) {
+    if ( empty( $package['contents'] ) ) {
+        return false;
+    }
+    $slug = lsrwc_get_free_shipping_class_slug();
+    foreach ( $package['contents'] as $item ) {
+        $product = $item['data'] ?? null;
+        if ( ! $product || ! method_exists( $product, 'get_shipping_class' ) ) {
+            continue;
+        }
+        if ( empty( $slug ) || $product->get_shipping_class() !== $slug ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Register shipping methods
@@ -861,6 +1012,25 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
     $ups_slug = $settings['ups_shipping_class_slug'] ?? '';
     $usps_slug = $settings['usps_shipping_class_slug'] ?? '';
+    $has_free_items = lsrwc_package_has_free_shipping_class( $package );
+    $has_chargeable_items = lsrwc_package_has_chargeable_items( $package );
+
+    if ( $has_free_items && ! $has_chargeable_items ) {
+        $label = __( 'Free Shipping', 'lsrwc' );
+        $rate_id = 'lsrwc_free_shipping';
+        $rate_object = class_exists( 'WC_Shipping_Rate' )
+            ? new WC_Shipping_Rate( $rate_id, $label, 0, array(), 'lsrwc_free_shipping' )
+            : array( 'label' => $label, 'cost' => 0 );
+        if ( $debug_mode ) {
+            $debug_info['filter_shipping'] = 'All items qualify for free shipping. Only offering free shipping rate.';
+            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+            lsrwc_log( 'All cart items use the free-shipping class. Returning only free shipping rate.', 'INFO' );
+        }
+        if ( $rate_object instanceof WC_Shipping_Rate ) {
+            return array( $rate_id => $rate_object );
+        }
+        return array( $rate_id => $rate_object );
+    }
 
     // Check for Canada first
     $destination_country = $package['destination']['country'] ?? 'US';
