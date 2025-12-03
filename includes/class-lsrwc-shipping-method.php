@@ -21,6 +21,14 @@ if ( ! class_exists( 'LSRWC_Shipping_Method' ) ) {
             $settings = get_option( 'lsrwc_settings', array() );
             $debug_mode = $settings['debug_mode'] ?? 0;
             $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+            if ( lsrwc_cart_has_free_shipping_coupon() ) {
+                if ( $debug_mode ) {
+                    $debug_info['free_shipping_coupon_match'] = 'Free-shipping coupon detected. Carrier ' . $this->carrier . ' skipped.';
+                    set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+                    lsrwc_log( 'Free-shipping coupon active; skipping carrier ' . $this->carrier, 'INFO' );
+                }
+                return;
+            }
             $has_chargeable_items = lsrwc_package_has_chargeable_items( $package );
             if ( ! $has_chargeable_items ) {
                 if ( $debug_mode && lsrwc_package_has_free_shipping_class( $package ) ) {

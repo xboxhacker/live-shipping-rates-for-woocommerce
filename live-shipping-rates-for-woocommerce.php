@@ -2,7 +2,7 @@
 /*
 Plugin Name: Live Shipping Rates for WooCommerce
 Description: Integrates UPS and USPS live shipping rates into WooCommerce with OAuth 2.0 authentication, including GUI debugging and live rate testing.
-Version: 1.1.19
+Version: 1.1.20
 Author: William Hare & Grok3.0
 License: GPL2
 */
@@ -40,12 +40,12 @@ function lsrwc_enqueue_scripts( $hook ) {
     if ( $hook !== 'toplevel_page_live-shipping-rates' ) {
         return;
     }
-    wp_enqueue_script( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.js', array( 'jquery' ), '1.1.19', true );
+    wp_enqueue_script( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.js', array( 'jquery' ), '1.1.20', true );
     wp_localize_script( 'lsrwc-admin', 'lsrwc', array(
         'ajax_url' => admin_url( 'admin-ajax.php' ),
         'nonce' => wp_create_nonce( 'lsrwc_nonce' ),
     ));
-    wp_enqueue_style( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.css', array(), '1.1.19' );
+    wp_enqueue_style( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.css', array(), '1.1.20' );
 }
 
 // Add admin menu
@@ -996,6 +996,33 @@ function lsrwc_package_has_chargeable_items( $package ) {
     return false;
 }
 
+function lsrwc_cart_has_free_shipping_coupon() {
+    if ( ! function_exists( 'WC' ) ) {
+        return false;
+    }
+    $cart = WC()->cart ?? null;
+    if ( ! $cart || ! method_exists( $cart, 'get_coupons' ) ) {
+        return false;
+    }
+    foreach ( $cart->get_coupons() as $coupon ) {
+        if ( $coupon && method_exists( $coupon, 'get_free_shipping' ) && $coupon->get_free_shipping() ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function lsrwc_generate_free_shipping_rate() {
+    $label = __( 'Free Shipping', 'lsrwc' );
+    $rate_id = 'lsrwc_free_shipping';
+    if ( class_exists( 'WC_Shipping_Rate' ) ) {
+        $rate_object = new WC_Shipping_Rate( $rate_id, $label, 0, array(), 'lsrwc_free_shipping' );
+    } else {
+        $rate_object = array( 'label' => $label, 'cost' => 0 );
+    }
+    return array( $rate_id => $rate_object );
+}
+
 // Register shipping methods
 function lsrwc_add_shipping_methods( $methods ) {
     require_once plugin_dir_path( __FILE__ ) . 'includes/class-lsrwc-shipping-method.php';
@@ -1014,22 +1041,24 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
     $usps_slug = $settings['usps_shipping_class_slug'] ?? '';
     $has_free_items = lsrwc_package_has_free_shipping_class( $package );
     $has_chargeable_items = lsrwc_package_has_chargeable_items( $package );
+    $has_free_shipping_coupon = lsrwc_cart_has_free_shipping_coupon();
+
+    if ( $has_free_shipping_coupon ) {
+        if ( $debug_mode ) {
+            $debug_info['filter_shipping'] = 'Free-shipping coupon applied. Overriding carrier rates with free shipping.';
+            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+            lsrwc_log( 'Free-shipping coupon detected; returning only free shipping rate.', 'INFO' );
+        }
+        return lsrwc_generate_free_shipping_rate();
+    }
 
     if ( $has_free_items && ! $has_chargeable_items ) {
-        $label = __( 'Free Shipping', 'lsrwc' );
-        $rate_id = 'lsrwc_free_shipping';
-        $rate_object = class_exists( 'WC_Shipping_Rate' )
-            ? new WC_Shipping_Rate( $rate_id, $label, 0, array(), 'lsrwc_free_shipping' )
-            : array( 'label' => $label, 'cost' => 0 );
         if ( $debug_mode ) {
             $debug_info['filter_shipping'] = 'All items qualify for free shipping. Only offering free shipping rate.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
             lsrwc_log( 'All cart items use the free-shipping class. Returning only free shipping rate.', 'INFO' );
         }
-        if ( $rate_object instanceof WC_Shipping_Rate ) {
-            return array( $rate_id => $rate_object );
-        }
-        return array( $rate_id => $rate_object );
+        return lsrwc_generate_free_shipping_rate();
     }
 
     // Check for Canada first
