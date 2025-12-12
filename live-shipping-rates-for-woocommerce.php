@@ -2,10 +2,26 @@
 /*
 Plugin Name: Live Shipping Rates for WooCommerce
 Description: Integrates UPS and USPS live shipping rates into WooCommerce with OAuth 2.0 authentication, including GUI debugging and live rate testing.
-Version: 1.1.20
-Author: William Hare & Grok3.0
+Version: 1.1.22
+Author: William Hare
 License: GPL2
+GitHub Plugin URI: https://github.com/xboxhacker/live-shipping-rates-for-woocommerce
 */
+if ( ! defined( 'LSRWC_VERSION' ) ) {
+    define( 'LSRWC_VERSION', '1.1.22' );
+}
+
+if ( ! defined( 'LSRWC_PLUGIN_BASENAME' ) ) {
+    define( 'LSRWC_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+}
+
+if ( ! defined( 'LSRWC_PLUGIN_SLUG' ) ) {
+    define( 'LSRWC_PLUGIN_SLUG', 'live-shipping-rates-for-woocommerce' );
+}
+
+if ( ! defined( 'LSRWC_DEFAULT_GITHUB_REPO' ) ) {
+    define( 'LSRWC_DEFAULT_GITHUB_REPO', 'xboxhacker/live-shipping-rates-for-woocommerce' );
+}
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly
@@ -24,6 +40,8 @@ function lsrwc_init() {
         add_action( 'admin_init', 'lsrwc_register_settings' );
         // Enqueue scripts
         add_action( 'admin_enqueue_scripts', 'lsrwc_enqueue_scripts' );
+        // Enqueue frontend checkout scripts
+        add_action( 'wp_enqueue_scripts', 'lsrwc_enqueue_checkout_scripts' );
         // AJAX handlers
         add_action( 'wp_ajax_lsrwc_test_rates', 'lsrwc_test_rates_ajax' );
         add_action( 'wp_ajax_lsrwc_clear_debug', 'lsrwc_clear_debug_ajax' );
@@ -31,6 +49,11 @@ function lsrwc_init() {
         add_filter( 'woocommerce_shipping_methods', 'lsrwc_add_shipping_methods' );
         // Filter shipping methods based on cart contents
         add_filter( 'woocommerce_package_rates', 'lsrwc_filter_shipping_methods', 10, 2 );
+        // Force shipping calculation on checkout
+        add_action( 'woocommerce_checkout_update_order_review', 'lsrwc_force_shipping_recalculation' );
+        add_filter( 'woocommerce_shipping_packages', 'lsrwc_ensure_shipping_destination', 10, 1 );
+        // Clear shipping cache on checkout page load
+        add_action( 'woocommerce_before_checkout_form', 'lsrwc_clear_shipping_cache_on_checkout' );
     }
 }
 add_action( 'plugins_loaded', 'lsrwc_init' );
@@ -40,12 +63,179 @@ function lsrwc_enqueue_scripts( $hook ) {
     if ( $hook !== 'toplevel_page_live-shipping-rates' ) {
         return;
     }
-    wp_enqueue_script( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.js', array( 'jquery' ), '1.1.20', true );
+    wp_enqueue_script( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.js', array( 'jquery' ), LSRWC_VERSION, true );
     wp_localize_script( 'lsrwc-admin', 'lsrwc', array(
         'ajax_url' => admin_url( 'admin-ajax.php' ),
         'nonce' => wp_create_nonce( 'lsrwc_nonce' ),
     ));
-    wp_enqueue_style( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.css', array(), '1.1.20' );
+    wp_enqueue_style( 'lsrwc-admin', plugin_dir_url( __FILE__ ) . 'admin.css', array(), LSRWC_VERSION );
+}
+
+// Enqueue checkout scripts for auto-updating shipping
+function lsrwc_enqueue_checkout_scripts() {
+    if ( ! is_checkout() ) {
+        return;
+    }
+    wp_add_inline_script( 'wc-checkout', lsrwc_get_checkout_inline_script() );
+}
+
+// Inline JavaScript for checkout shipping updates
+function lsrwc_get_checkout_inline_script() {
+    return "
+    jQuery(function($) {
+        var lsrwcUpdateTimer = null;
+        var lsrwcLastAddress = '';
+        
+        // Fields that affect shipping calculation
+        var shippingFields = [
+            '#billing_postcode',
+            '#billing_city', 
+            '#billing_state',
+            '#billing_country',
+            '#shipping_postcode',
+            '#shipping_city',
+            '#shipping_state', 
+            '#shipping_country'
+        ];
+        
+        // Function to get current address hash for comparison
+        function getAddressHash() {
+            var shipToDifferent = $('#ship-to-different-address-checkbox').is(':checked');
+            var hash = '';
+            if (shipToDifferent) {
+                hash = $('#shipping_postcode').val() + '|' + $('#shipping_city').val() + '|' + $('#shipping_state').val() + '|' + $('#shipping_country').val();
+            } else {
+                hash = $('#billing_postcode').val() + '|' + $('#billing_city').val() + '|' + $('#billing_state').val() + '|' + $('#billing_country').val();
+            }
+            return hash;
+        }
+        
+        // Function to trigger checkout update
+        function triggerShippingUpdate() {
+            var currentAddress = getAddressHash();
+            if (currentAddress !== lsrwcLastAddress && currentAddress.split('|')[0] !== '') {
+                lsrwcLastAddress = currentAddress;
+                $('body').trigger('update_checkout');
+            }
+        }
+        
+        // Debounced update function
+        function debouncedUpdate() {
+            clearTimeout(lsrwcUpdateTimer);
+            lsrwcUpdateTimer = setTimeout(triggerShippingUpdate, 500);
+        }
+        
+        // Bind to address field changes
+        $(shippingFields.join(', ')).on('change keyup blur', function() {
+            debouncedUpdate();
+        });
+        
+        // Also trigger on ship-to-different-address checkbox change
+        $('#ship-to-different-address-checkbox').on('change', function() {
+            setTimeout(triggerShippingUpdate, 100);
+        });
+        
+        // Trigger initial update if we have address data on page load
+        setTimeout(function() {
+            var postcode = $('#ship-to-different-address-checkbox').is(':checked') ? $('#shipping_postcode').val() : $('#billing_postcode').val();
+            if (postcode && postcode.length >= 5) {
+                $('body').trigger('update_checkout');
+            }
+        }, 500);
+    });
+    ";
+}
+
+// Force shipping recalculation when checkout updates
+function lsrwc_force_shipping_recalculation( $post_data ) {
+    // Parse the posted data
+    parse_str( $post_data, $posted );
+    
+    // Clear shipping calculation cache to force recalculation
+    WC()->shipping()->reset_shipping();
+    
+    // Invalidate package rates cache
+    $packages = WC()->cart->get_shipping_packages();
+    foreach ( $packages as $package_key => $package ) {
+        $session_key = 'shipping_for_package_' . $package_key;
+        WC()->session->set( $session_key, false );
+    }
+    
+    // Log for debugging
+    $settings = get_option( 'lsrwc_settings', array() );
+    if ( ! empty( $settings['debug_mode'] ) ) {
+        lsrwc_log( 'Checkout update: Cleared shipping cache for recalculation.', 'INFO' );
+    }
+}
+
+// Ensure shipping destination is set from checkout fields
+function lsrwc_ensure_shipping_destination( $packages ) {
+    if ( ! is_checkout() && ! wp_doing_ajax() ) {
+        return $packages;
+    }
+    
+    // Get customer shipping/billing data
+    $customer = WC()->customer;
+    if ( ! $customer ) {
+        return $packages;
+    }
+    
+    foreach ( $packages as $key => $package ) {
+        // If destination is empty, try to get from customer data
+        if ( empty( $package['destination']['postcode'] ) ) {
+            $packages[$key]['destination']['postcode'] = $customer->get_shipping_postcode() ?: $customer->get_billing_postcode();
+            $packages[$key]['destination']['city'] = $customer->get_shipping_city() ?: $customer->get_billing_city();
+            $packages[$key]['destination']['state'] = $customer->get_shipping_state() ?: $customer->get_billing_state();
+            $packages[$key]['destination']['country'] = $customer->get_shipping_country() ?: $customer->get_billing_country();
+        }
+    }
+    
+    return $packages;
+}
+
+// Clear shipping cache when checkout page loads ONLY if no rates exist
+function lsrwc_clear_shipping_cache_on_checkout() {
+    if ( ! WC()->cart || ! WC()->session ) {
+        return;
+    }
+    
+    $settings = get_option( 'lsrwc_settings', array() );
+    $debug_mode = ! empty( $settings['debug_mode'] );
+    
+    // Check if we already have valid shipping rates cached
+    $packages = WC()->cart->get_shipping_packages();
+    $has_valid_rates = false;
+    
+    foreach ( $packages as $package_key => $package ) {
+        $session_key = 'shipping_for_package_' . $package_key;
+        $cached_rates = WC()->session->get( $session_key );
+        
+        // Check if we have cached rates with actual shipping methods
+        if ( ! empty( $cached_rates ) && ! empty( $cached_rates['rates'] ) ) {
+            $has_valid_rates = true;
+            break;
+        }
+    }
+    
+    // Only clear cache if there are no valid rates already calculated
+    if ( ! $has_valid_rates ) {
+        if ( WC()->shipping() ) {
+            WC()->shipping()->reset_shipping();
+        }
+        
+        foreach ( $packages as $package_key => $package ) {
+            $session_key = 'shipping_for_package_' . $package_key;
+            WC()->session->set( $session_key, false );
+        }
+        
+        if ( $debug_mode ) {
+            lsrwc_log( 'Checkout page loaded: No valid shipping rates found - cleared cache to trigger calculation.', 'INFO' );
+        }
+    } else {
+        if ( $debug_mode ) {
+            lsrwc_log( 'Checkout page loaded: Valid shipping rates already cached - keeping existing rates.', 'INFO' );
+        }
+    }
 }
 
 // Add admin menu
@@ -80,11 +270,15 @@ function lsrwc_register_settings() {
     add_settings_field( 'usps_shipping_class_slug', 'USPS Shipping Class Slug', 'lsrwc_usps_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'free_shipping_class_slug', 'Free Shipping Class Slug', 'lsrwc_free_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'debug_mode', 'Enable Extensive Debugging', 'lsrwc_debug_mode_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'github_enable_updates', 'Enable GitHub Auto Updates', 'lsrwc_github_enable_updates_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'github_repo', 'GitHub Repository (owner/repo)', 'lsrwc_github_repo_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'github_access_token', 'GitHub Access Token (optional)', 'lsrwc_github_access_token_field', 'live-shipping-rates', 'lsrwc_main_section' );
 }
 
 // Sanitize settings
 function lsrwc_sanitize_settings( $input ) {
     $sanitized = array();
+    $existing = get_option( 'lsrwc_settings', array() );
     $sanitized['ups_client_id'] = sanitize_text_field( $input['ups_client_id'] ?? '' );
     $sanitized['ups_client_secret'] = sanitize_text_field( $input['ups_client_secret'] ?? '' );
     $sanitized['ups_account_number'] = sanitize_text_field( $input['ups_account_number'] ?? '' );
@@ -101,6 +295,15 @@ function lsrwc_sanitize_settings( $input ) {
     $sanitized['usps_shipping_class_slug'] = sanitize_text_field( $input['usps_shipping_class_slug'] ?? '' );
     $sanitized['free_shipping_class_slug'] = sanitize_text_field( $input['free_shipping_class_slug'] ?? '' );
     $sanitized['debug_mode'] = isset( $input['debug_mode'] ) ? 1 : 0;
+    $sanitized['github_enable_updates'] = isset( $input['github_enable_updates'] ) ? 1 : 0;
+    $sanitized['github_repo'] = sanitize_text_field( $input['github_repo'] ?? '' );
+    $sanitized['github_access_token'] = sanitize_text_field( $input['github_access_token'] ?? '' );
+    if (
+        ( $existing['github_repo'] ?? '' ) !== $sanitized['github_repo'] ||
+        ( $existing['github_access_token'] ?? '' ) !== $sanitized['github_access_token']
+    ) {
+        delete_transient( 'lsrwc_github_release_info' );
+    }
     return $sanitized;
 }
 
@@ -277,6 +480,26 @@ function lsrwc_debug_mode_field() {
     $settings = get_option( 'lsrwc_settings', array() );
     $checked = isset( $settings['debug_mode'] ) && $settings['debug_mode'] ? 'checked' : '';
     echo "<input type='checkbox' name='lsrwc_settings[debug_mode]' value='1' $checked>";
+}
+
+function lsrwc_github_enable_updates_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $checked = ! empty( $settings['github_enable_updates'] ) ? 'checked' : '';
+    echo "<label><input type='checkbox' name='lsrwc_settings[github_enable_updates]' value='1' $checked> Enable automatic updates directly from the configured GitHub repository.</label>";
+}
+
+function lsrwc_github_repo_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $value = $settings['github_repo'] ?? '';
+    echo "<input type='text' name='lsrwc_settings[github_repo]' value='" . esc_attr( $value ) . "' class='regular-text' placeholder='owner/repository'>";
+    echo '<p class="description">Example: xboxhacker/live-shipping-rates-for-woocommerce. Used to check releases via the GitHub API.</p>';
+}
+
+function lsrwc_github_access_token_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $value = $settings['github_access_token'] ?? '';
+    echo "<input type='password' name='lsrwc_settings[github_access_token]' value='" . esc_attr( $value ) . "' class='regular-text' autocomplete='new-password'>";
+    echo '<p class="description">Optional. Required only for private repositories or to avoid GitHub API rate limits.</p>';
 }
 
 // OAuth token functions
@@ -1023,6 +1246,166 @@ function lsrwc_generate_free_shipping_rate() {
     return array( $rate_id => $rate_object );
 }
 
+function lsrwc_is_github_updates_enabled() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    if ( empty( $settings['github_enable_updates'] ) ) {
+        return false;
+    }
+    return (bool) lsrwc_parse_github_repository( $settings );
+}
+
+function lsrwc_parse_github_repository( $settings = null ) {
+    if ( null === $settings ) {
+        $settings = get_option( 'lsrwc_settings', array() );
+    }
+    $repo = trim( $settings['github_repo'] ?? '' );
+    if ( empty( $repo ) && defined( 'LSRWC_DEFAULT_GITHUB_REPO' ) ) {
+        $repo = LSRWC_DEFAULT_GITHUB_REPO;
+    }
+    if ( empty( $repo ) || strpos( $repo, '/' ) === false ) {
+        return false;
+    }
+    list( $owner, $repository ) = array_map( 'trim', explode( '/', $repo, 2 ) );
+    if ( empty( $owner ) || empty( $repository ) ) {
+        return false;
+    }
+    return array(
+        'owner' => $owner,
+        'repo' => $repository,
+        'token' => trim( $settings['github_access_token'] ?? '' ),
+    );
+}
+
+function lsrwc_fetch_latest_github_release( $force = false ) {
+    if ( ! lsrwc_is_github_updates_enabled() ) {
+        return false;
+    }
+    $parts = lsrwc_parse_github_repository();
+    if ( ! $parts ) {
+        return false;
+    }
+    $cache_key = 'lsrwc_github_release_info';
+    if ( ! $force ) {
+        $cached = get_transient( $cache_key );
+        if ( $cached ) {
+            return $cached;
+        }
+    }
+    $url = sprintf( 'https://api.github.com/repos/%s/%s/releases/latest', $parts['owner'], $parts['repo'] );
+    $headers = array(
+        'Accept' => 'application/vnd.github+json',
+        'User-Agent' => 'lsrwc-plugin-updater'
+    );
+    if ( ! empty( $parts['token'] ) ) {
+        $headers['Authorization'] = 'token ' . $parts['token'];
+    }
+    $response = wp_remote_get( $url, array( 'headers' => $headers, 'timeout' => 20 ) );
+    if ( is_wp_error( $response ) ) {
+        lsrwc_log( 'GitHub release fetch failed: ' . $response->get_error_message(), 'ERROR' );
+        return false;
+    }
+    $status_code = wp_remote_retrieve_response_code( $response );
+    if ( 200 !== $status_code ) {
+        lsrwc_log( 'GitHub release fetch failed with status ' . $status_code, 'WARNING' );
+        return false;
+    }
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+    if ( ! is_array( $body ) ) {
+        return false;
+    }
+    set_transient( $cache_key, $body, HOUR_IN_SECONDS );
+    return $body;
+}
+
+function lsrwc_normalize_version_string( $version ) {
+    $version = trim( (string) $version );
+    if ( 0 === strpos( $version, 'v' ) || 0 === strpos( $version, 'V' ) ) {
+        $version = substr( $version, 1 );
+    }
+    return $version;
+}
+
+function lsrwc_prepare_github_package_url( $release, $parts ) {
+    if ( ! empty( $release['zipball_url'] ) ) {
+        return $release['zipball_url'];
+    }
+    if ( empty( $parts ) || empty( $release['tag_name'] ) ) {
+        return '';
+    }
+    return sprintf( 'https://github.com/%s/%s/archive/refs/tags/%s.zip', $parts['owner'], $parts['repo'], $release['tag_name'] );
+}
+
+function lsrwc_check_github_update( $transient ) {
+    if ( empty( $transient->checked ) || ! lsrwc_is_github_updates_enabled() ) {
+        return $transient;
+    }
+    $release = lsrwc_fetch_latest_github_release();
+    if ( ! $release ) {
+        return $transient;
+    }
+    $remote_version = lsrwc_normalize_version_string( $release['tag_name'] ?? $release['name'] ?? '' );
+    if ( empty( $remote_version ) || version_compare( $remote_version, LSRWC_VERSION, '<=' ) ) {
+        return $transient;
+    }
+    $parts = lsrwc_parse_github_repository();
+    $transient->response[ LSRWC_PLUGIN_BASENAME ] = (object) array(
+        'slug' => LSRWC_PLUGIN_SLUG,
+        'plugin' => LSRWC_PLUGIN_BASENAME,
+        'new_version' => $remote_version,
+        'url' => $release['html_url'] ?? sprintf( 'https://github.com/%s/%s', $parts['owner'], $parts['repo'] ),
+        'package' => lsrwc_prepare_github_package_url( $release, $parts ),
+    );
+    return $transient;
+}
+
+function lsrwc_github_plugin_information( $result, $action, $args ) {
+    if ( 'plugin_information' !== $action || empty( $args->slug ) || LSRWC_PLUGIN_SLUG !== $args->slug || ! lsrwc_is_github_updates_enabled() ) {
+        return $result;
+    }
+    $release = lsrwc_fetch_latest_github_release();
+    if ( ! $release ) {
+        return $result;
+    }
+    $parts = lsrwc_parse_github_repository();
+    $remote_version = lsrwc_normalize_version_string( $release['tag_name'] ?? '' );
+    $description = ! empty( $release['body'] ) ? wpautop( esc_html( $release['body'] ) ) : '<p>Latest release available on GitHub.</p>';
+    $repo_url = sprintf( 'https://github.com/%s/%s', $parts['owner'], $parts['repo'] );
+
+    $plugin_info = (object) array(
+        'name' => 'Live Shipping Rates for WooCommerce',
+        'slug' => LSRWC_PLUGIN_SLUG,
+        'version' => $remote_version ?: LSRWC_VERSION,
+        'author' => '<a href="' . esc_url( $repo_url ) . '">GitHub</a>',
+        'homepage' => $release['html_url'] ?? $repo_url,
+        'download_link' => lsrwc_prepare_github_package_url( $release, $parts ),
+        'requires' => '5.6',
+        'tested' => '6.6',
+        'sections' => array(
+            'description' => $description,
+            'changelog' => $description,
+        ),
+    );
+
+    return $plugin_info;
+}
+
+function lsrwc_maybe_inject_github_headers( $args, $url ) {
+    if ( ! lsrwc_is_github_updates_enabled() ) {
+        return $args;
+    }
+    if ( false === strpos( $url, 'github.com' ) && false === strpos( $url, 'api.github.com' ) ) {
+        return $args;
+    }
+    $parts = lsrwc_parse_github_repository();
+    if ( empty( $args['headers']['User-Agent'] ) ) {
+        $args['headers']['User-Agent'] = 'lsrwc-plugin-updater';
+    }
+    if ( ! empty( $parts['token'] ) ) {
+        $args['headers']['Authorization'] = 'token ' . $parts['token'];
+    }
+    return $args;
+}
+
 // Register shipping methods
 function lsrwc_add_shipping_methods( $methods ) {
     require_once plugin_dir_path( __FILE__ ) . 'includes/class-lsrwc-shipping-method.php';
@@ -1084,9 +1467,14 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
     $has_ups_slug = false;
 
     // Check each item in the cart for shipping classes
+    $detected_classes = array();
     foreach ( $package['contents'] as $item ) {
         $product = $item['data'];
         $shipping_class = $product->get_shipping_class();
+        $detected_classes[] = array(
+            'product' => $product->get_name(),
+            'shipping_class' => $shipping_class ?: '(none)'
+        );
         if ( $shipping_class === $ups_slug ) {
             $has_ups_slug = true;
         }
@@ -1101,31 +1489,40 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
 
     // Filter shipping rates based on shipping class presence
     $filtered_rates = array();
-    if ( $has_usps_slug && !$has_ups_slug ) {
-        // Only show USPS rates
-        foreach ( $rates as $rate_id => $rate ) {
-            if ( strpos( $rate_id, 'lsrwc_usps' ) === 0 ) {
-                $filtered_rates[$rate_id] = $rate;
-            }
-        }
-    } elseif ( $has_ups_slug && !$has_usps_slug ) {
-        // Only show UPS rates
+    if ( $has_ups_slug ) {
+        // If any item requires UPS, only show UPS rates regardless of USPS presence.
         foreach ( $rates as $rate_id => $rate ) {
             if ( strpos( $rate_id, 'lsrwc_ups' ) === 0 ) {
                 $filtered_rates[$rate_id] = $rate;
             }
         }
+    } elseif ( $has_usps_slug ) {
+        // Only USPS items remain in the cart.
+        foreach ( $rates as $rate_id => $rate ) {
+            if ( strpos( $rate_id, 'lsrwc_usps' ) === 0 ) {
+                $filtered_rates[$rate_id] = $rate;
+            }
+        }
     } else {
-        // Show all available rates
+        // No specific shipping class detected; return all available carrier rates.
         $filtered_rates = $rates;
     }
 
     if ( $debug_mode ) {
         $debug_info['filter_shipping'] = "Filtered rates for country $destination_country: Has USPS: " . ($has_usps_slug ? 'Yes' : 'No') . ", Has UPS: " . ($has_ups_slug ? 'Yes' : 'No') . ", Rates: " . print_r( array_keys( $filtered_rates ), true );
+        $debug_info['filter_shipping_classes'] = $detected_classes;
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-        lsrwc_log( "Filtered rates for country $destination_country: Has USPS: " . ($has_usps_slug ? 'Yes' : 'No') . ", Has UPS: " . ($has_ups_slug ? 'Yes' : 'No') . ", Rates: " . print_r( array_keys( $filtered_rates ), true ) );
+        lsrwc_log(
+            "Filtered rates for country $destination_country: Has USPS: " . ($has_usps_slug ? 'Yes' : 'No') . ", Has UPS: " . ($has_ups_slug ? 'Yes' : 'No') . ", Rates: " . print_r( array_keys( $filtered_rates ), true ),
+            'INFO',
+            array( 'shipping_classes' => $detected_classes )
+        );
     }
     return $filtered_rates;
 }
+
+add_filter( 'pre_set_site_transient_update_plugins', 'lsrwc_check_github_update' );
+add_filter( 'plugins_api', 'lsrwc_github_plugin_information', 10, 3 );
+add_filter( 'http_request_args', 'lsrwc_maybe_inject_github_headers', 10, 2 );
 add_filter( 'woocommerce_package_rates', 'lsrwc_filter_shipping_methods', 10, 2 );
 ?>

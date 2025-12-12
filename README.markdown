@@ -11,7 +11,9 @@ I used this for integration with Veeqo shipping. This plugin gets the rates, the
 
 - **Real-Time Rates**: Fetches live shipping rates from UPS (Ground) and USPS (Ground Advantage) using their respective APIs.
 - **OAuth 2.0 Authentication**: Securely connects to UPS and USPS APIs with token-based authentication.
-- **Conditional Shipping Logic**: Displays only UPS rates if any cart item requires UPS shipping (based on shipping class slug); otherwise, shows both UPS and USPS rates.
+- **Conditional Shipping Logic**: Automatically prioritizes UPS whenever any cart item requires it, falling back to USPS only when no UPS-only products remain.
+- **Free Shipping Coupons & Classes**: Honors WooCommerce free-shipping coupons and shipping classes, automatically short-circuiting carrier calls when every item qualifies for free shipping.
+- **GitHub Auto Updates**: Optional toggle that polls the configured GitHub repository for the latest tagged release and installs it directly from the WordPress dashboard.
 - **Total Cart Weight Calculation**: Aggregates the weight of all cart items (including quantities) for accurate rate fetching.
 - **Admin Testing Interface**: Allows administrators to test live rates with custom inputs (city, state, ZIP, weight, dimensions).
 - **Debugging Tools**: Provides detailed debug logs for API requests and responses, with a "Clear Debug" button to reset logs.
@@ -51,6 +53,7 @@ I used this for integration with Veeqo shipping. This plugin gets the rates, the
    - **UPS/USPS Percentage Increase (%)**: Optional markup for shipping rates.
    - **UPS Shipping Class Slug**, **USPS Shipping Class Slug**: Match the slugs defined in WooCommerce (e.g., `ups-shipping`, `usps-shipping`).
    - **Enable Extensive Debugging**: Check to log detailed API requests/responses.
+   - **GitHub Auto Updates**: Enable the toggle, enter the repository in `owner/repo` format, and optionally paste a Personal Access Token for private repositories or higher API limits.
 
 ### Shipping Zones
 The plugin integrates with WooCommerce’s shipping zones to control where and how rates are offered.
@@ -77,6 +80,12 @@ The plugin integrates with WooCommerce’s shipping zones to control where and h
    - Edit products via **Products > All Products**.
    - In the **Shipping** tab, assign the appropriate shipping class (e.g., `ups-shipping` for UPS-only items).
    - Set valid weights and dimensions for accurate rate calculations.
+
+### GitHub Auto Updates
+1. Open **Live Shipping Rates > Settings** and enable **GitHub Auto Updates**.
+2. Enter the repository in `owner/repository` format (default is `xboxhacker/live-shipping-rates-for-woocommerce`, so you can leave the field blank unless you are using a fork).
+3. (Optional) Paste a GitHub Personal Access Token if the repository is private or if you want to avoid GitHub’s anonymous rate limits.
+4. Save the settings, then visit **Dashboard > Updates** and click “Check Again.” WordPress will download and install the latest tagged release from GitHub whenever a newer version is available.
 
 ## Usage
 
@@ -137,3 +146,20 @@ For issues or feature requests, contact the authors via the plugin’s support c
 ## License
 
 This plugin is licensed under the GNU General Public License v2 (GPL2). See the license file for details.
+
+## Changelog
+
+### 1.1.22 - 2025-12-12
+- Added the plugin version bump and repository metadata so WordPress aligns with the latest GitHub release tag.
+- Exposed the GitHub Plugin URI in the plugin header for compatibility with third-party updaters.
+- Polished README instructions covering auto-update configuration and defaults.
+
+### 1.1.21 - 2025-12-12
+- Added optional GitHub auto-update support, including settings for enabling updates, selecting the repository, and providing an access token.
+- Integrated release polling with the WordPress update screen and documented the workflow in this README.
+- Cached GitHub responses and surfaced basic logging to help debug update checks.
+
+### 1.1.20 - 2025-12-03
+- Added native support for WooCommerce free-shipping coupons so carrier rates are suppressed and a single free rate is returned when coupons are applied.
+- Refactored the free-shipping logic into reusable helpers to ensure consistent behavior between coupon-driven and shipping-class-driven scenarios.
+- Documented the free-shipping workflow in the feature list.
