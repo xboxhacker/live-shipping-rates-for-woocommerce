@@ -1,272 +1,491 @@
-# Debug Log - Manager Tool
+# Live Shipping Rates for WooCommerce
 
-[![WordPress Plugin Version](https://img.shields.io/wordpress/plugin/v/debug-log-config-tool)](https://wordpress.org/plugins/debug-log-config-tool/)
-[![WordPress Plugin Rating](https://img.shields.io/wordpress/plugin/rating/debug-log-config-tool)](https://wordpress.org/plugins/debug-log-config-tool/)
-[![WordPress Plugin Downloads](https://img.shields.io/wordpress/plugin/dt/debug-log-config-tool)](https://wordpress.org/plugins/debug-log-config-tool/)
+[![WordPress Plugin Version](https://img.shields.io/wordpress/plugin/v/live-shipping-rates-for-woocommerce)](https://wordpress.org/plugins/live-shipping-rates-for-woocommerce/)
+[![WordPress Plugin Rating](https://img.shields.io/wordpress/plugin/rating/live-shipping-rates-for-woocommerce)](https://wordpress.org/plugins/live-shipping-rates-for-woocommerce/)
+[![WordPress Plugin Downloads](https://img.shields.io/wordpress/plugin/dt/live-shipping-rates-for-woocommerce)](https://wordpress.org/plugins/live-shipping-rates-for-woocommerce/)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
 
-**Contributors:** pyrobd
-**Tags:** debug, debug log, developer, tools
-**Requires at least:** 5.6
-**Tested up to:** 6.6.1
-**Stable tag:** 2.0.0
-**Requires PHP:** 5.6
-**License:** GPLv2 or later
-**License URI:** https://www.gnu.org/licenses/gpl-2.0.html
+**Contributors:** xboxhacker  
+**Tags:** woocommerce, shipping, ups, usps, live-rates, oauth, api  
+**Requires at least:** 5.0  
+**Tested up to:** 6.6  
+**Stable tag:** 1.1.22  
+**Requires PHP:** 7.2  
+**License:** GPL v2 or later  
+**License URI:** https://www.gnu.org/licenses/gpl-2.0.html  
 
-The "Debug Log Config Tool" simplifies WordPress debugging by providing a powerful interface to manage debug logs, toggle settings, and analyze issues directly from your dashboard.
+The Live Shipping Rates for WooCommerce plugin integrates real-time shipping rates from UPS and USPS directly into your WooCommerce store using OAuth 2.0 authentication.
 
 ## Description
 
-A comprehensive debugging toolkit for WordPress developers and site administrators. This plugin gives you complete control over WordPress debugging without editing wp-config.php files or using FTP.
+Live Shipping Rates for WooCommerce seamlessly fetches live shipping rates from UPS (Ground) and USPS (Ground Advantage) carriers directly within your WooCommerce cart and checkout pages. The plugin features OAuth 2.0 authentication for secure API connections, intelligent conditional logic based on cart contents, and comprehensive debugging tools.
 
-### 🎥 Quick Demo
+### Key Features
 
-[youtube https://youtu.be/moJPyyVfm3A]
+- **Real-Time Rate Calculation**: Fetches live shipping rates from UPS Ground and USPS Ground Advantage APIs
+- **OAuth 2.0 Authentication**: Secure token-based authentication for both UPS and USPS APIs
+- **Smart Shipping Logic**: Automatically prioritizes UPS when cart contains UPS-only items, falls back to USPS otherwise
+- **Free Shipping Support**: Honors WooCommerce free-shipping coupons and shipping classes
+- **GitHub Auto-Updates**: Optional automatic updates from GitHub releases
+- **Admin Testing Interface**: Built-in rate testing with custom parameters
+- **Comprehensive Debugging**: Detailed logging with severity levels and debug transients
+- **Shipping Zone Integration**: Full WooCommerce shipping zone compatibility
+- **Dynamic Checkout Updates**: Real-time shipping rate updates as customers modify addresses
+- **Weight & Dimension Aggregation**: Accurate package calculations excluding free shipping items
 
-### ✨ Key Features
+### Use Cases
 
-- **WP-CLI Style Terminal**: Execute WordPress commands directly from your browser with syntax highlighting and auto-completion
-- **Database Tools**: Run SQL queries, view table structures, and optimize your database (super admin only)
-- **Debug Constants Manager**: Toggle all WordPress debug constants with a single click
-- **Log Viewer**: View, filter, and analyze debug logs with syntax highlighting and error categorization
-- **Query Inspector**: Examine database queries with SAVEQUERIES support
-- **Email Notifications**: Get alerts when new errors appear in your logs
-- **Safe Mode**: Quickly disable all plugins except selected ones for troubleshooting
-- **Custom Log Paths**: Set custom log file locations with filter support
-
-### 🔧 Debug Constants Available
-
-| Constant | Default Value | Description |
-|----------|---------------|-------------|
-| **WP_DEBUG** | true | Enables WordPress debug mode |
-| **WP_DEBUG_LOG** | true | Saves all errors to a debug.log file |
-| **SCRIPT_DEBUG** | false | Uses development versions of core JS and CSS files |
-| **WP_DEBUG_DISPLAY** | false | Controls whether debug messages display on screen |
-| **SAVEQUERIES** | false | Saves database queries for analysis |
-
-### 🛠️ Developer Tools
-
-- **Terminal Commands**: Use WP-CLI style commands like `wp core version` or `wp plugin list`
-- **Database Explorer**: Run SELECT queries and view results in a formatted table
-- **Stack Trace Analysis**: Visualize error stack traces for easier debugging
-- **Hook Inspector**: View all registered hooks and their callbacks
-- **Environment Detection**: Using Laravel Mix to automatically hide development features in production
-
-> **Developer API**: Apply custom filters like `apply_filters('wp_debuglog_log_file_path', $file);` to extend functionality
-
-Please note: Constant values will be restored on plugin deactivation as it was before activating the plugin.
-
-### 🚀 Improvements
-
-We're constantly working to improve the Debug Log Config Tool. Here are some features we're planning to add in future releases:
-
-#### Developer Tools
-- **Code Snippets Runner**: Securely run PHP code snippets for testing (admin only)
-- **Theme Template Debugger**: See which template files are being used on each page
-- **Shortcode Analyzer**: Debug shortcodes and their rendered output
-- **Cron Job Manager**: View, add, edit, and delete WordPress cron jobs
-- **Transients Manager**: View and clean up transients in the database
-
-#### Performance Tools
-- **Memory Usage Profiling**: Track memory usage across different parts of your site
-- **Page Load Time Analysis**: Measure and optimize page load performance
-- **Asset Loading Monitor**: See which scripts and styles are loaded on each page
-
-#### Enhanced Debugging
-- **REST API Debugger**: Monitor and log REST API requests and responses
-- **AJAX Request Logger**: Track AJAX requests for easier debugging
-- **Conditional Debugging**: Enable debug logging only for specific pages or conditions
-
-#### UI Improvements
-- **Dark Mode**: Dark theme for the debugging interface
-- **Customizable Dashboard**: Personalize which debug widgets appear
-- **Export/Import Settings**: Save and load your debug configurations
-
-Want to contribute or suggest features? Visit our [GitHub repository](https://github.com/nkb-bd/debug-log-config-tool).
-
+- **E-commerce Stores**: Perfect for online retailers needing accurate shipping costs
+- **Multi-Carrier Shipping**: Support for UPS and USPS with intelligent routing
+- **Veeqo Integration**: Designed for seamless integration with Veeqo shipping workflows
+- **Complex Shipping Rules**: Handle mixed carts with different shipping requirements
 
 ## Installation
 
-1. Upload the plugin files to the `/wp-content/plugins/debug-log-config-tool` directory, or install the plugin through the WordPress plugins screen directly.
-1. Activate the plugin through the 'Plugins' screen in WordPress
-1. Go to Tools-> Debug Logs screen to see the debug logs or access it from the top navbar.
+### Automatic Installation
 
+1. Go to **Plugins > Add New** in your WordPress admin
+2. Search for "Live Shipping Rates for WooCommerce"
+3. Click **Install Now** and **Activate**
 
-## Frequently Asked Questions
-
-### Do I need file manager/ftp or modify wp-config.php file?
-
-No, just activate the plugin and turn off/on debug mode from plugin settings
-
-### Can I see full debug in dashboard?
-
-Yes you can see a simple log in dashboard widget and nicely formatted view in the plugin
-
-### What does safe mode do?
-Safe mode will deactivate all the plugin except the selected one. When you turn safe mode off it will restore all the previous activated plugin.
- # Live Shipping Rates for WooCommerce
- 
-
-## Overview
-
-The Live Shipping Rates for WooCommerce plugin allows online stores to fetch real-time shipping rates from UPS and USPS directly within the WooCommerce cart and checkout pages. It supports OAuth 2.0 authentication for secure API access, includes a user-friendly admin interface for testing rates, and provides extensive debugging tools. The plugin also features conditional logic to display shipping methods based on cart contents, ensuring a seamless customer experience.
-
-I used this for integration with Veeqo shipping. This plugin gets the rates, then orders are sent to Veeqo, with shipping rates, for shipment.
-
-## Features
-
-- **Real-Time Rates**: Fetches live shipping rates from UPS (Ground) and USPS (Ground Advantage) using their respective APIs.
-- **OAuth 2.0 Authentication**: Securely connects to UPS and USPS APIs with token-based authentication.
-- **Conditional Shipping Logic**: Automatically prioritizes UPS whenever any cart item requires it, falling back to USPS only when no UPS-only products remain.
-- **Free Shipping Coupons & Classes**: Honors WooCommerce free-shipping coupons and shipping classes, automatically short-circuiting carrier calls when every item qualifies for free shipping.
-- **GitHub Auto Updates**: Optional toggle that polls the configured GitHub repository for the latest tagged release and installs it directly from the WordPress dashboard.
-- **Total Cart Weight Calculation**: Aggregates the weight of all cart items (including quantities) for accurate rate fetching.
-- **Admin Testing Interface**: Allows administrators to test live rates with custom inputs (city, state, ZIP, weight, dimensions).
-- **Debugging Tools**: Provides detailed debug logs for API requests and responses, with a "Clear Debug" button to reset logs.
-- **Shipping Zone Integration**: Seamlessly integrates with WooCommerce shipping zones for flexible rate configuration.
-- **Customizable Slugs**: Supports custom shipping class slugs to control which products trigger UPS or USPS rates.
-
-## Installation
+### Manual Installation
 
 1. **Download the Plugin**:
-	- Obtain the plugin files (e.g., from GitHub or a ZIP archive).
+   - Download the latest release from [GitHub](https://github.com/xboxhacker/live-shipping-rates-for-woocommerce/releases)
 
 2. **Upload to WordPress**:
-	- Navigate to **Plugins > Add New** in your WordPress admin panel.
-	- Click **Upload Plugin** and select the plugin ZIP file.
-	- Alternatively, extract the plugin folder to `/wp-content/plugins/live-shipping-rates-for-woocommerce/`.
+   - Navigate to **Plugins > Add New > Upload Plugin**
+   - Select the downloaded ZIP file and click **Install Now**
 
-3. **Activate the Plugin**:
-	- Go to **Plugins > Installed Plugins** and activate "Live Shipping Rates for WooCommerce".
+3. **Alternative Upload**:
+   - Extract the plugin folder to `/wp-content/plugins/live-shipping-rates-for-woocommerce/`
 
-4. **Set File Permissions** (if manually uploaded):
-	```bash
-	chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/*.php
-	chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/*.css
-	chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/*.js
-	chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/includes/*.php
-	chmod 755 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/includes
-	```
+4. **Activate the Plugin**:
+   - Go to **Plugins > Installed Plugins**
+   - Find "Live Shipping Rates for WooCommerce" and click **Activate**
+
+5. **Set File Permissions** (if manually uploaded):
+   ```bash
+   chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/*.php
+   chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/*.css
+   chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/*.js
+   chmod 644 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/includes/*.php
+   chmod 755 /path/to/wp-content/plugins/live-shipping-rates-for-woocommerce/includes
+   ```
 
 ## Configuration
 
-### Plugin Settings
-1. Navigate to **Live Shipping Rates > Settings** in the WordPress admin panel.
-2. Configure the following fields:
-	- **UPS Client ID**, **UPS Client Secret**, **UPS Account Number**: Obtain from the UPS Developer Portal.
-	- **USPS Consumer Key**, **USPS Consumer Secret**: Obtain from the USPS Shipping API portal.
-	- **Origin ZIP Code**, **Origin City**, **Origin State**, **Origin Address Line 1**: Set your store’s shipping origin details (e.g., `33915`, `ANY TOWN`, `FL`, `555 Main St.`).
-	- **UPS/USPS Percentage Increase (%)**: Optional markup for shipping rates.
-	- **UPS Shipping Class Slug**, **USPS Shipping Class Slug**: Match the slugs defined in WooCommerce (e.g., `ups-shipping`, `usps-shipping`).
-	- **Enable Extensive Debugging**: Check to log detailed API requests/responses.
-	- **GitHub Auto Updates**: Enable the toggle, enter the repository in `owner/repo` format, and optionally paste a Personal Access Token for private repositories or higher API limits.
+### API Credentials Setup
 
-### Shipping Zones
-The plugin integrates with WooCommerce’s shipping zones to control where and how rates are offered.
+#### UPS Configuration
+1. Visit the [UPS Developer Portal](https://developer.ups.com/)
+2. Create an account and register your application
+3. Obtain your **Client ID**, **Client Secret**, and **Account Number**
+
+#### USPS Configuration
+1. Visit the [USPS Shipping API Portal](https://www.usps.com/business/web-tools-apis/)
+2. Register for API access
+3. Obtain your **Consumer Key** and **Consumer Secret**
+
+### Plugin Settings
+
+1. Navigate to **Live Shipping Rates > Settings** in your WordPress admin
+2. Configure the following required fields:
+
+#### Required Settings
+- **UPS Client ID**: Your UPS OAuth client ID
+- **UPS Client Secret**: Your UPS OAuth client secret
+- **UPS Account Number**: Your UPS account number for rate calculations
+- **USPS Consumer Key**: Your USPS API consumer key
+- **USPS Consumer Secret**: Your USPS API consumer secret
+- **Origin ZIP Code**: Your store's shipping origin ZIP code
+- **Origin City**: Your store's shipping origin city
+- **Origin State**: Your store's shipping origin state (2-letter code)
+- **Origin Address Line 1**: Your store's shipping origin street address
+
+#### Optional Settings
+- **UPS Percentage Increase (%)**: Markup percentage for UPS rates (default: 0)
+- **UPS International Percentage Increase (%)**: Additional markup for international UPS rates (default: 0)
+- **USPS Percentage Increase (%)**: Markup percentage for USPS rates (default: 0)
+- **UPS Shipping Class Slug**: Slug for products requiring UPS shipping (default: `ups-shipping`)
+- **USPS Shipping Class Slug**: Slug for products requiring USPS shipping (default: `usps-shipping`)
+- **Free Shipping Class Slug**: Slug for free shipping products (default: `free-shipping`)
+- **Enable Extensive Debugging**: Enable detailed logging (default: disabled)
+- **Enable GitHub Auto Updates**: Enable automatic updates from GitHub (default: disabled)
+- **GitHub Repository**: Repository in `owner/repo` format (default: `xboxhacker/live-shipping-rates-for-woocommerce`)
+- **GitHub Access Token**: Personal access token for private repos or higher rate limits (optional)
+
+### Shipping Zone Configuration
 
 1. **Access Shipping Zones**:
-	- Go to **WooCommerce > Settings > Shipping > Shipping Zones**.
+   - Go to **WooCommerce > Settings > Shipping > Shipping Zones**
 
 2. **Add Shipping Methods**:
-	- Add or edit a shipping zone (e.g., "Domestic USA").
-	- Click **Add Shipping Method** and select:
-	  - **UPS Live Rates (Ground)** for UPS Ground rates.
-	  - **USPS Live Rates (Ground Advantage)** for USPS Ground Advantage rates.
-	- Ensure both methods are added to the zones covering your customers’ locations.
+   - Click on a shipping zone (e.g., "Domestic USA") or create a new one
+   - Click **Add Shipping Method**
+   - Select **UPS Live Rates (Ground)** for UPS shipping
+   - Select **USPS Live Rates (Ground Advantage)** for USPS shipping
+   - Configure instance settings if needed
 
-3. **Verify Visibility**:
-	- The methods appear as "UPS Live Rates (Ground)" and "USPS Live Rates (Ground Advantage)" in the zone settings, making them easy to identify.
+3. **Zone Coverage**:
+   - Ensure zones cover all your customer locations
+   - Methods appear as "UPS Live Rates (Ground)" and "USPS Live Rates (Ground Advantage)"
 
 ### Product Configuration
-1. **Set Shipping Classes**:
-	- Go to **WooCommerce > Settings > Shipping > Shipping Classes**.
-	- Create or verify classes (e.g., "UPS Shipping" with slug `ups-shipping`, "USPS Shipping" with slug `usps-shipping`).
+
+1. **Create Shipping Classes**:
+   - Go to **WooCommerce > Settings > Shipping > Shipping Classes**
+   - Create classes like:
+     - "UPS Shipping" with slug `ups-shipping`
+     - "USPS Shipping" with slug `usps-shipping`
+     - "Free Shipping" with slug `free-shipping`
 
 2. **Assign to Products**:
-	- Edit products via **Products > All Products**.
-	- In the **Shipping** tab, assign the appropriate shipping class (e.g., `ups-shipping` for UPS-only items).
-	- Set valid weights and dimensions for accurate rate calculations.
+   - Edit individual products via **Products > All Products**
+   - In the **Shipping** tab, assign the appropriate shipping class
+   - Ensure products have accurate **Weight** and **Dimensions** set
 
-### GitHub Auto Updates
-1. Open **Live Shipping Rates > Settings** and enable **GitHub Auto Updates**.
-2. Enter the repository in `owner/repository` format (default is `xboxhacker/live-shipping-rates-for-woocommerce`, so you can leave the field blank unless you are using a fork).
-3. (Optional) Paste a GitHub Personal Access Token if the repository is private or if you want to avoid GitHub’s anonymous rate limits.
-4. Save the settings, then visit **Dashboard > Updates** and click “Check Again.” WordPress will download and install the latest tagged release from GitHub whenever a newer version is available.
+### GitHub Auto-Updates
+
+1. **Enable Auto-Updates**:
+   - In plugin settings, check **Enable GitHub Auto Updates**
+   - Enter repository as `owner/repository` (leave blank for default)
+
+2. **Access Token (Optional)**:
+   - Generate a Personal Access Token in your GitHub settings
+   - Paste the token to avoid rate limits or access private repositories
+
+3. **Update Process**:
+   - Visit **Dashboard > Updates**
+   - Click **Check Again** to poll for new releases
+   - WordPress will automatically download and install tagged releases
 
 ## Usage
 
-### Testing Live Rates
-1. Go to **Live Shipping Rates > Test Live Rates** in the admin panel.
-2. Enter test inputs (e.g., City: `ANY TOWN`, State: `FL`, ZIP: `33915`, Weight: `12`, Length: `12`, Width: `12`, Height: `12`).
-3. Click **Get Rates** to view UPS and USPS rates.
-4. Check the **Debug Information** section in **Settings** for API request/response logs.
+### Testing Shipping Rates
 
-### Cart and Checkout
-- **Weight Aggregation**: The plugin sums the weights of all cart items (e.g., 2 lbs * 2 + 3 lbs * 1 = 7 lbs) for rate fetching.
-- **Conditional Logic**:
-  - If any cart item has the `ups-shipping` class, only UPS Ground rates are shown.
-  - Otherwise, both UPS Ground and USPS Ground Advantage rates are displayed.
-- Rates update dynamically based on the customer’s shipping address and cart contents.
+1. **Access Test Interface**:
+   - Go to **Live Shipping Rates > Test Live Rates**
 
-### Debugging
-- Enable debugging in `wp-config.php`:
-  ```php
-  define( 'WP_DEBUG', true );
-  define( 'WP_DEBUG_LOG', true );
-  define( 'WP_DEBUG_DISPLAY', false );
-  ```
-- View logs in `/wp-content/debug.log` or the **Debug Information** section in the plugin settings.
-- Use the **Clear Debug** button to reset debug data and cached tokens.
+2. **Configure Test Parameters**:
+   - **City**: Destination city (e.g., "New York")
+   - **State**: Destination state (e.g., "NY")
+   - **ZIP**: Destination ZIP code (e.g., "10001")
+   - **Weight**: Package weight in lbs (e.g., "5.5")
+   - **Length**: Package length in inches (e.g., "12")
+   - **Width**: Package width in inches (e.g., "8")
+   - **Height**: Package height in inches (e.g., "6")
 
-## Shipping Zones
+3. **Run Test**:
+   - Click **Get Rates** to fetch live rates
+   - View results in the interface
+   - Check debug logs for detailed API interactions
 
-Shipping zones are managed through WooCommerce’s built-in system, allowing you to define where and how shipping methods are offered.
+### Cart and Checkout Behavior
 
-- **Configuration**:
-  - Each zone can include multiple shipping methods (e.g., both UPS and USPS).
-  - Add "UPS Live Rates (Ground)" and "USPS Live Rates (Ground Advantage)" to relevant zones (e.g., "Domestic USA" for US customers).
-- **Visibility**:
-  - The plugin uses descriptive titles to ensure clarity in the WooCommerce settings interface.
-  - Example: In a zone named "Domestic USA", you’ll see "UPS Live Rates (Ground)" and "USPS Live Rates (Ground Advantage)" listed as available methods.
-- **Behavior**:
-  - Rates are fetched only for zones that match the customer’s shipping address.
-  - The plugin’s conditional logic ensures that UPS rates take precedence if any cart item requires UPS shipping.
+#### Weight Calculation
+- Plugin aggregates weights from all cart items
+- Multiplies individual weights by quantities
+- Example: 2 × 2lb items + 1 × 3lb item = 7lb total
+
+#### Conditional Shipping Logic
+- **UPS Priority**: If any cart item has UPS shipping class, only UPS rates display
+- **USPS Fallback**: If no UPS items, both UPS and USPS rates available
+- **Free Shipping**: Carrier APIs bypassed when free shipping applies
+
+#### Dynamic Updates
+- Shipping rates update automatically as customers change addresses
+- Debounced updates prevent excessive API calls
+- Cache management ensures fresh rate calculations
+
+### Debugging and Monitoring
+
+#### Enable Debugging
+```php
+// Add to wp-config.php
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+```
+
+#### Debug Locations
+- **Plugin Debug Section**: View in **Live Shipping Rates > Settings > Debug Information**
+- **WordPress Debug Log**: Located at `/wp-content/debug.log`
+- **Plugin Log File**: Located at `/wp-content/lsrwc_debug.log`
+
+#### Debug Information Includes
+- API request/response details
+- Package weight and dimension calculations
+- Shipping class detection
+- Rate filtering logic
+- Token caching status
+
+#### Clearing Debug Data
+- Use the **Clear Debug** button in plugin settings
+- Clears cached tokens and debug transients
+- Resets shipping rate caches
+
+## API Reference
+
+### Helper Functions
+
+#### Free Shipping Detection
+```php
+lsrwc_cart_has_free_shipping_coupon() // Check for active free shipping coupons
+lsrwc_package_has_free_shipping_class($package) // Check if package qualifies for free shipping
+lsrwc_package_has_chargeable_items($package) // Check if package has items requiring carrier shipping
+```
+
+#### Shipping Class Helpers
+```php
+lsrwc_get_free_shipping_class_slug() // Get configured free shipping class slug
+```
+
+#### Logging Functions
+```php
+lsrwc_log($message, $severity, $context) // Log with severity levels (INFO, WARNING, ERROR)
+lsrwc_set_last_notice($message, $type) // Set admin notices for user feedback
+```
+
+#### GitHub Integration
+```php
+lsrwc_parse_github_repository($repo_string) // Parse owner/repo format
+lsrwc_fetch_latest_github_release($owner, $repo, $token) // Fetch latest release info
+lsrwc_check_github_update($transient) // WordPress update check hook
+lsrwc_github_plugin_information($result, $action, $args) // Plugin info hook
+```
+
+### Filters and Hooks
+
+#### Shipping Filters
+- `woocommerce_package_rates` - Filter final shipping rates
+- `woocommerce_package_rates` - Main rate filtering hook
+- `woocommerce_shipping_packages` - Modify shipping packages
+
+#### Checkout Hooks
+- `woocommerce_checkout_update_order_review` - Force rate recalculation
+- `woocommerce_before_checkout_form` - Clear shipping cache
+
+#### Admin Hooks
+- `admin_enqueue_scripts` - Enqueue admin assets
+- `wp_enqueue_scripts` - Enqueue frontend assets
 
 ## Troubleshooting
 
-- **Rates Not Displaying**:
-  - Verify that products have valid weights and dimensions in **Products > Edit Product > Shipping**.
-  - Ensure shipping class slugs match those in **Live Shipping Rates > Settings**.
-  - Check that the correct shipping methods are added to the relevant shipping zones.
-- **Only UPS Rates Showing**:
-  - Confirm no cart items have the `ups-shipping` class unless intended.
-- **Debugging**:
-  - Enable **Extensive Debugging** in plugin settings.
-  - Review logs in **Live Shipping Rates > Settings > Debug Information** or `/wp-content/debug.log`.
-  - Look for errors in `ups_rate_response`, `usps_rate_response`, or `cart_package_weight`.
+### Common Issues
 
-## Support
+#### "No rates available" errors
+- **Cause**: API credentials incorrect or expired
+- **Solution**: Verify API keys in plugin settings, check token validity
 
-For issues or feature requests, contact the authors via the plugin’s support channel or repository. Provide debug logs and detailed descriptions to expedite resolution.
+#### Only UPS rates showing
+- **Cause**: Products incorrectly assigned UPS shipping class
+- **Solution**: Check product shipping classes, verify slug configuration
 
-## License
+#### Rates not updating on checkout
+- **Cause**: JavaScript conflicts or caching issues
+- **Solution**: Clear browser cache, check for JavaScript errors
 
-This plugin is licensed under the GNU General Public License v2 (GPL2). See the license file for details.
+#### API rate limits exceeded
+- **Cause**: Too many API calls, missing access token
+- **Solution**: Add GitHub access token, implement caching
+
+### Debug Checklist
+
+1. **Enable Debugging**: Check "Enable Extensive Debugging" in settings
+2. **Check Logs**: Review debug information in plugin settings
+3. **Verify Credentials**: Ensure API keys are correct and active
+4. **Test API Access**: Use "Test Live Rates" interface
+5. **Check Product Setup**: Verify weights, dimensions, and shipping classes
+6. **Review Shipping Zones**: Confirm methods added to correct zones
+
+### Error Messages
+
+#### USPS Errors
+- `INVALID_CONSUMER_KEY`: Check USPS Consumer Key
+- `INVALID_CONSUMER_SECRET`: Verify USPS Consumer Secret
+- `PROCESSING_CATEGORY_INVALID`: Review package dimensions and weight
+
+#### UPS Errors
+- `Invalid Client ID`: Verify UPS Client ID
+- `Invalid Client Secret`: Check UPS Client Secret
+- `Invalid Account Number`: Confirm UPS Account Number
+
+### Performance Optimization
+
+- **Caching**: API responses cached for 1 hour
+- **Debouncing**: Checkout updates debounced to reduce API calls
+- **Conditional Logic**: Carrier APIs only called when necessary
+- **Background Processing**: Consider moving heavy calculations to background
+
+## Frequently Asked Questions
+
+### General Questions
+
+**Q: Do I need separate accounts for UPS and USPS?**  
+A: Yes, you need active developer accounts with both carriers to obtain API credentials.
+
+**Q: Can I use this plugin with other shipping carriers?**  
+A: Currently supports only UPS and USPS. Additional carriers may be added in future versions.
+
+**Q: Does the plugin handle international shipping?**  
+A: Yes, both UPS and USPS support international rates. Configure appropriate shipping zones.
+
+### Technical Questions
+
+**Q: How does the plugin handle package dimensions?**  
+A: Uses maximum dimensions across all items, excluding free shipping products.
+
+**Q: Can I modify the shipping rate markup?**  
+A: Yes, configure percentage increases in plugin settings for each carrier.
+
+**Q: Does the plugin support multiple packages?**  
+A: Currently processes as single package. Multi-package support may be added later.
+
+### Configuration Questions
+
+**Q: What if I don't want to use shipping classes?**  
+A: Leave class slugs blank. Plugin will show both carrier rates for all products.
+
+**Q: Can I disable one carrier?**  
+A: Don't add that carrier's method to shipping zones, or leave API credentials blank.
+
+**Q: How do I set up free shipping?**  
+A: Create shipping class with configured free shipping slug, or use WooCommerce coupons.
+
+## Screenshots
+
+1. **Settings Page** - Configure API credentials and plugin options
+2. **Test Rates Interface** - Test shipping rates with custom parameters
+3. **Debug Information** - View detailed API logs and debug data
+4. **Shipping Zone Configuration** - Add methods to WooCommerce zones
+5. **Product Shipping Setup** - Configure shipping classes and dimensions
 
 ## Changelog
 
-### 1.1.22 - 2025-12-12
-- Added the plugin version bump and repository metadata so WordPress aligns with the latest GitHub release tag.
-- Exposed the GitHub Plugin URI in the plugin header for compatibility with third-party updaters.
-- Polished README instructions covering auto-update configuration and defaults.
+### 1.1.22 - December 12, 2025
+- Added plugin version bump and repository metadata for WordPress update compatibility
+- Exposed GitHub Plugin URI in plugin header for third-party updater support
+- Polished README documentation with comprehensive setup instructions
 
-### 1.1.21 - 2025-12-12
-- Added optional GitHub auto-update support, including settings for enabling updates, selecting the repository, and providing an access token.
-- Integrated release polling with the WordPress update screen and documented the workflow in this README.
-- Cached GitHub responses and surfaced basic logging to help debug update checks.
+### 1.1.21 - December 12, 2025
+- Added optional GitHub auto-update support with repository configuration
+- Integrated WordPress update hooks for automatic release polling
+- Implemented GitHub API response caching and basic update logging
+- Added Personal Access Token support for private repositories and rate limit avoidance
 
-### 1.1.20 - 2025-12-03
-- Added native support for WooCommerce free-shipping coupons so carrier rates are suppressed and a single free rate is returned when coupons are applied.
-- Refactored the free-shipping logic into reusable helpers to ensure consistent behavior between coupon-driven and shipping-class-driven scenarios.
-- Documented the free-shipping workflow in the feature list.
+### 1.1.20 - December 3, 2025
+- Added native WooCommerce free-shipping coupon support
+- Implemented automatic carrier bypass when free shipping coupons active
+- Refactored free-shipping logic into reusable helper functions
+- Enhanced documentation with free shipping workflow details
+
+### 1.1.19 - November 15, 2025
+- Improved USPS processing category calculation for better rate accuracy
+- Enhanced error handling and logging for API failures
+- Added debug transient storage for better troubleshooting
+- Fixed shipping class detection and logging
+
+### 1.1.18 - October 20, 2025
+- Added UPS priority logic for mixed cart scenarios
+- Implemented shipping class-based rate filtering
+- Enhanced debug logging with contextual information
+- Improved checkout shipping recalculation reliability
+
+### 1.1.17 - September 10, 2025
+- Initial public release with UPS and USPS OAuth integration
+- Basic admin interface for settings and testing
+- Shipping zone integration and rate calculation
+- Comprehensive debugging and logging system
+
+## Upgrade Notice
+
+### 1.1.22
+This version adds GitHub auto-update support and improves documentation. Update for better maintenance workflow.
+
+### 1.1.21
+Adds GitHub integration for automatic updates. Requires GitHub repository access for full functionality.
+
+### 1.1.20
+Adds free shipping coupon support. Update to ensure proper handling of WooCommerce coupons.
+
+## Contributing
+
+We welcome contributions to improve the Live Shipping Rates for WooCommerce plugin!
+
+### Development Setup
+1. Fork the repository on GitHub
+2. Clone your fork locally
+3. Install development dependencies
+4. Create a feature branch
+5. Make your changes
+6. Test thoroughly
+7. Submit a pull request
+
+### Coding Standards
+- Follow WordPress Coding Standards
+- Use PHP 7.2+ compatible syntax
+- Include comprehensive documentation
+- Add unit tests for new features
+
+### Reporting Issues
+- Use GitHub Issues for bug reports
+- Include detailed steps to reproduce
+- Provide debug logs when possible
+- Specify WordPress and WooCommerce versions
+
+## Support
+
+### Documentation
+- Complete setup guide available in this README
+- API reference with all helper functions
+- Troubleshooting section with common solutions
+
+### Community Support
+- GitHub Issues for technical questions
+- WordPress.org forums for general discussion
+- Plugin review system for feedback
+
+### Professional Support
+For custom development, priority support, or consulting services, contact the plugin author.
+
+## License
+
+This plugin is licensed under the GNU General Public License v2 (GPL2) or later.
+
+```
+Live Shipping Rates for WooCommerce
+Copyright (C) 2025, William Hare
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+```
+
+## Credits
+
+**Plugin Author**: William Hare  
+**GitHub**: [@xboxhacker](https://github.com/xboxhacker)  
+**Contributors**: Community contributors welcome!
+
+### Third-Party Libraries
+- WordPress Core APIs
+- WooCommerce Framework
+- UPS OAuth API
+- USPS Web Tools API
+
+### Acknowledgments
+- Thanks to the WooCommerce community for framework support
+- UPS and USPS for API access and documentation
+- WordPress.org for plugin hosting and review system
 
