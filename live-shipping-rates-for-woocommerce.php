@@ -2,7 +2,7 @@
 /*
 Plugin Name: Live Shipping Rates for WooCommerce
 Description: Integrates UPS and USPS live shipping rates into WooCommerce with OAuth 2.0 authentication, including GUI debugging and live rate testing.
-Version: 1.2.0
+Version: 1.2.1
 Author: William Hare
 License: GPL2
 Requires at least: 5.6
@@ -12,7 +12,7 @@ WC tested up to: 10.9
 GitHub Plugin URI: https://github.com/xboxhacker/live-shipping-rates-for-woocommerce
 */
 if ( ! defined( 'LSRWC_VERSION' ) ) {
-    define( 'LSRWC_VERSION', '1.2.0' );
+    define( 'LSRWC_VERSION', '1.2.1' );
 }
 
 if ( ! defined( 'LSRWC_PLUGIN_BASENAME' ) ) {
@@ -317,8 +317,12 @@ function lsrwc_settings_page() {
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
     $tab = isset( $_GET['tab'] ) ? $_GET['tab'] : 'settings';
     ?>
-    <div class="wrap">
-        <h1>Live Shipping Rates</h1>
+    <div class="wrap lsrwc-admin-wrap">
+        <h1 class="wp-heading-inline">Live Shipping Rates</h1>
+        <span class="lsrwc-version" style="display:inline-block;margin:8px 0 0 10px;padding:4px 10px;border:1px solid #c3c4c7;border-radius:4px;background:#f6f7f7;color:#1d2327;font-size:13px;font-weight:600;line-height:1.4;vertical-align:middle;">
+            Version <?php echo esc_html( LSRWC_VERSION ); ?>
+        </span>
+        <hr class="wp-header-end">
         <h2 class="nav-tab-wrapper">
             <a href="?page=live-shipping-rates&tab=settings" class="nav-tab <?php echo $tab === 'settings' ? 'nav-tab-active' : ''; ?>">Settings</a>
             <a href="?page=live-shipping-rates&tab=test-rates" class="nav-tab <?php echo $tab === 'test-rates' ? 'nav-tab-active' : ''; ?>">Test Live Rates</a>
@@ -1043,10 +1047,128 @@ function lsrwc_get_usps_rate_indicator( $length, $width, $height ) {
     // USPS Ground Advantage - Commercial parcels are priced by weight as "Single-Piece" (SP).
     // Only parcels EXCEEDING 1 cubic foot (1,728 cubic inches) are priced on dimensional
     // weight using the "Dimensional Rectangular" (DR) indicator (DMM 283 section 1.0).
-    // Sending DR for normal small parcels forces the higher dimensional price, which is why
-    // quotes ran far above the commercial label price customers actually pay.
     $cubic_inches = floatval( $length ) * floatval( $width ) * floatval( $height );
     return ( $cubic_inches > 1728 ) ? 'DR' : 'SP';
+}
+
+function lsrwc_get_usps_rate_option_price( $option ) {
+    if ( ! is_array( $option ) ) {
+        return 0;
+    }
+
+    $price = floatval( $option['totalBasePrice'] ?? 0 );
+    if ( $price <= 0 && ! empty( $option['rates'][0]['price'] ) ) {
+        $price = floatval( $option['rates'][0]['price'] );
+    }
+
+    if ( ! empty( $option['rates'] ) && is_array( $option['rates'] ) ) {
+        foreach ( $option['rates'] as $rate ) {
+            if ( empty( $rate['fees'] ) || ! is_array( $rate['fees'] ) ) {
+                continue;
+            }
+            foreach ( $rate['fees'] as $fee ) {
+                $price += floatval( $fee['price'] ?? 0 );
+            }
+        }
+    }
+
+    return $price;
+}
+
+function lsrwc_select_lowest_usps_ground_advantage_option( $rate_options ) {
+    $lowest_price = null;
+    $selected_option = null;
+    $selected_rate = null;
+
+    if ( ! is_array( $rate_options ) ) {
+        return array(
+            'price' => 0,
+            'option' => null,
+            'rate' => null,
+        );
+    }
+
+    foreach ( $rate_options as $option ) {
+        if ( empty( $option['rates'] ) || ! is_array( $option['rates'] ) ) {
+            continue;
+        }
+
+        foreach ( $option['rates'] as $rate ) {
+            if ( ( $rate['mailClass'] ?? '' ) !== 'USPS_GROUND_ADVANTAGE' ) {
+                continue;
+            }
+
+            $price = lsrwc_get_usps_rate_option_price( $option );
+            if ( $price <= 0 ) {
+                continue;
+            }
+
+            if ( $lowest_price === null || $price < $lowest_price ) {
+                $lowest_price = $price;
+                $selected_option = $option;
+                $selected_rate = $rate;
+            }
+            break;
+        }
+    }
+
+    return array(
+        'price' => $lowest_price ?? 0,
+        'option' => $selected_option,
+        'rate' => $selected_rate,
+    );
+}
+
+function lsrwc_fetch_usps_rates_single( $token, $body, $debug_mode = false ) {
+    $url = 'https://apis.usps.com/prices/v3/base-rates/search';
+    $args = array(
+        'method' => 'POST',
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $token,
+            'Content-Type' => 'application/json',
+        ),
+        'body' => json_encode( $body ),
+    );
+
+    if ( $debug_mode ) {
+        lsrwc_log( "USPS fallback rate request: URL=$url, Body=" . print_r( $body, true ) );
+    }
+
+    $response = wp_remote_post( $url, $args );
+    if ( is_wp_error( $response ) ) {
+        return array(
+            'error' => $response->get_error_message(),
+        );
+    }
+
+    $response_code = wp_remote_retrieve_response_code( $response );
+    $response_body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    if ( $debug_mode ) {
+        lsrwc_log( "USPS fallback rate response: Code=$response_code, Body=" . print_r( $response_body, true ) );
+    }
+
+    if ( $response_code !== 200 ) {
+        return array(
+            'error' => $response_body['error']['message'] ?? 'Unknown error',
+            'response_code' => $response_code,
+            'response_body' => $response_body,
+        );
+    }
+
+    if ( ! isset( $response_body['totalBasePrice'] ) ) {
+        return array(
+            'error' => 'USPS fallback response did not include totalBasePrice.',
+            'response_body' => $response_body,
+        );
+    }
+
+    return array(
+        'price' => floatval( $response_body['totalBasePrice'] ),
+        'rate' => $response_body['rates'][0] ?? array(),
+        'source' => 'base-rates',
+        'response_body' => $response_body,
+    );
 }
 
 // Fetch USPS rates
@@ -1073,8 +1195,11 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
     $processing_category_data = lsrwc_get_usps_processing_category( $weight, $length, $width, $height );
     $processing_category = $processing_category_data['category'];
     $rate_indicator = lsrwc_get_usps_rate_indicator( $length, $width, $height );
+    $cubic_feet = ( floatval( $length ) * floatval( $width ) * floatval( $height ) ) / 1728;
 
-    $url = 'https://apis.usps.com/prices/v3/base-rates/search';
+    // Request all eligible Ground Advantage commercial options (single-piece, cubic, etc.)
+    // and use the cheapest, matching how USPS.com and label tools quote shipments.
+    $url = 'https://apis.usps.com/prices/v3/base-rates-list/search';
     $body = array(
         'originZIPCode' => $settings['origin_zip'] ?? '78664',
         'destinationZIPCode' => $zip,
@@ -1082,12 +1207,12 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         'length' => $length,
         'width' => $width,
         'height' => $height,
-        'mailClass' => 'USPS_GROUND_ADVANTAGE',
+        'mailClasses' => array( 'USPS_GROUND_ADVANTAGE' ),
         'processingCategory' => $processing_category,
         'destinationEntryFacilityType' => 'NONE',
-        'rateIndicator' => $rate_indicator,
         'priceType' => 'COMMERCIAL',
         'mailingDate' => gmdate( 'Y-m-d' ),
+        'hasNonstandardCharacteristics' => ( $processing_category === 'NONSTANDARD' ),
     );
 
     $args = array(
@@ -1101,9 +1226,8 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
 
     if ( $debug_mode ) {
         $category_note = empty( $processing_category_data['reasons'] ) ? 'Package within machinable thresholds.' : 'Reasons: ' . implode( '; ', $processing_category_data['reasons'] );
-        $cubic_feet = ( floatval( $length ) * floatval( $width ) * floatval( $height ) ) / 1728;
         $debug_info['usps_processing_category'] = "Processing category: $processing_category. $category_note Length+Girth: " . number_format( $processing_category_data['length_plus_girth'], 2 );
-        $debug_info['usps_rate_indicator'] = "Rate indicator: $rate_indicator (Single-Piece 'SP' is used at or below 1 cubic foot; Dimensional 'DR' only above). Package volume: " . number_format( $cubic_feet, 3 ) . " cubic feet.";
+        $debug_info['usps_rate_indicator'] = "Fallback single-rate indicator: $rate_indicator. Package volume: " . number_format( $cubic_feet, 3 ) . " cubic feet.";
         $debug_info['usps_rate_request'] = "USPS rate request URL: $url\nBody: " . print_r( $body, true );
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
         lsrwc_log( "USPS rate request: URL=$url, Body=" . print_r( $body, true ) );
@@ -1128,7 +1252,51 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         lsrwc_log( "USPS rate response: Code=$response_code, Body=" . print_r( $response_body, true ) );
     }
 
-    if ( $response_code !== 200 ) {
+    $selected = array(
+        'price' => 0,
+        'option' => null,
+        'rate' => null,
+        'source' => '',
+    );
+
+    if ( $response_code === 200 && ! empty( $response_body['rateOptions'] ) ) {
+        $selected = lsrwc_select_lowest_usps_ground_advantage_option( $response_body['rateOptions'] );
+        $selected['source'] = 'base-rates-list';
+    }
+
+    if ( empty( $selected['price'] ) ) {
+        $fallback_body = array(
+            'originZIPCode' => $settings['origin_zip'] ?? '78664',
+            'destinationZIPCode' => $zip,
+            'weight' => $weight,
+            'length' => $length,
+            'width' => $width,
+            'height' => $height,
+            'mailClass' => 'USPS_GROUND_ADVANTAGE',
+            'processingCategory' => $processing_category,
+            'destinationEntryFacilityType' => 'NONE',
+            'rateIndicator' => $rate_indicator,
+            'priceType' => 'COMMERCIAL',
+            'mailingDate' => gmdate( 'Y-m-d' ),
+        );
+        $fallback = lsrwc_fetch_usps_rates_single( $token, $fallback_body, $debug_mode );
+        if ( ! empty( $fallback['price'] ) ) {
+            $selected = array(
+                'price' => $fallback['price'],
+                'option' => null,
+                'rate' => $fallback['rate'] ?? array(),
+                'source' => $fallback['source'] ?? 'base-rates',
+            );
+        } elseif ( ! empty( $fallback['error'] ) ) {
+            if ( $debug_mode ) {
+                $debug_info['usps_rates_error'] = 'USPS API error: ' . $fallback['error'];
+                set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+                lsrwc_log( 'USPS API error: ' . $fallback['error'], 'ERROR' );
+            }
+            lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS API error: ' . $fallback['error'] );
+            return array();
+        }
+    } elseif ( $response_code !== 200 ) {
         $error_message = $response_body['error']['message'] ?? 'Unknown error';
         if ( $debug_mode ) {
             $debug_info['usps_rates_error'] = "USPS API error: $error_message";
@@ -1140,28 +1308,30 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
     }
 
     $rates = array();
-    if ( isset( $response_body['totalBasePrice'] ) ) {
-        $original_rate = floatval( $response_body['totalBasePrice'] );
+    if ( ! empty( $selected['price'] ) ) {
+        $original_rate = floatval( $selected['price'] );
         $percentage = $settings['usps_percentage'] ?? 0;
         $adjusted_rate = $original_rate * ( 1 + $percentage / 100 );
+        $rate_description = $selected['rate']['description'] ?? '';
+        $rate_indicator_used = $selected['rate']['rateIndicator'] ?? $rate_indicator;
         $rates['USPS Ground Advantage'] = array(
             'original' => '$' . number_format( $original_rate, 2 ),
             'adjusted' => '$' . number_format( $adjusted_rate, 2 )
         );
         if ( $debug_mode ) {
-            $debug_info['usps_rates_calculated'] = "Service: USPS Ground Advantage, Original Rate: $original_rate, Percentage: $percentage%, Adjusted Rate: $adjusted_rate";
+            $debug_info['usps_rates_calculated'] = "Service: USPS Ground Advantage, Source: {$selected['source']}, Rate indicator: $rate_indicator_used, Description: $rate_description, Original Rate: $original_rate, Percentage: $percentage%, Adjusted Rate: $adjusted_rate";
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( "USPS rates calculated: Service=USPS Ground Advantage, Original Rate=$original_rate, Percentage=$percentage%, Adjusted Rate=$adjusted_rate" );
+            lsrwc_log( "USPS rates calculated: Service=USPS Ground Advantage, Source={$selected['source']}, Rate indicator=$rate_indicator_used, Description=$rate_description, Original Rate=$original_rate, Percentage=$percentage%, Adjusted Rate=$adjusted_rate" );
         }
     }
 
     if ( empty( $rates ) ) {
         if ( $debug_mode ) {
-            $debug_info['usps_rates_error'] = 'No rate found in USPS response (totalBasePrice missing).';
+            $debug_info['usps_rates_error'] = 'No eligible USPS Ground Advantage rate found.';
             set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( 'No rate found in USPS response (totalBasePrice missing).', 'WARNING' );
+            lsrwc_log( 'No eligible USPS Ground Advantage rate found.', 'WARNING' );
         }
-        lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS response did not include totalBasePrice for Ground Advantage.' );
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS response did not include an eligible Ground Advantage rate.' );
     } else {
         lsrwc_set_last_notice( 'usps_rates_last_notice', 'USPS returned ' . count( $rates ) . ' rate(s).' );
     }

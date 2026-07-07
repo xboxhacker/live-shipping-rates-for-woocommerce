@@ -12,7 +12,7 @@
 **Requires PHP:** 7.4  
 **WC requires at least:** 7.0  
 **WC tested up to:** 10.9  
-**Stable tag:** 1.2.0  
+**Stable tag:** 1.2.1  
 **License:** GPL v2 or later  
 **License URI:** https://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -365,6 +365,10 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 
 ## Changelog
 
+### 1.2.1 - July 7, 2026
+- **USPS cheapest-rate selection**: Ground Advantage now uses the `base-rates-list` API to return all eligible commercial options (single-piece, cubic tiers, etc.) and quotes the lowest price, matching how USPS.com and label purchase tools select rates. Falls back to the single-rate endpoint if the list call fails.
+- Debug output now includes the selected rate source, indicator, and description.
+
 ### 1.2.0 - July 7, 2026
 - **Fixed USPS over-quoting**: USPS Ground Advantage now uses the Single-Piece (`SP`) rate indicator for parcels up to 1 cubic foot, and only uses Dimensional Rectangular (`DR`) for parcels exceeding 1 cubic foot, per USPS DMM 283. Previously every parcel was priced with `DR`, which forced dimensional pricing and quoted well above the commercial label price customers actually pay.
 - **UPS negotiated rates**: UPS requests now include `NegotiatedRatesIndicator` and prefer the account's negotiated (discounted) charge when authorized, falling back to published rates otherwise.
@@ -409,6 +413,9 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 - Comprehensive debugging and logging system
 
 ## Upgrade Notice
+
+### 1.2.1
+Further USPS pricing fix: quotes the cheapest eligible Ground Advantage commercial option (including cubic pricing for small parcels) instead of only the weight-based single-piece rate.
 
 ### 1.2.0
 Important pricing fix. Corrects USPS Ground Advantage over-quoting (uses Single-Piece pricing for normal parcels instead of always applying dimensional pricing) and lets UPS return your account's negotiated rates. Tested with WordPress 7.0 and WooCommerce 10.9.
