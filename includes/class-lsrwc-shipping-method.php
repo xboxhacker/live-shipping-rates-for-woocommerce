@@ -96,13 +96,14 @@ if ( ! class_exists( 'LSRWC_Shipping_Method' ) ) {
                     continue;
                 }
                 $dim_value = $product->get_data()[$dimension] ? floatval( $product->get_data()[$dimension] ) : 0;
-                $quantity = isset( $item['quantity'] ) ? max( 1, intval( $item['quantity'] ) ) : 1;
-                // Use the maximum dimension across all items, adjusted for quantity
-                $max_dimension = max( $max_dimension, $dim_value * $quantity );
+                // Ship in the largest single item's box: take the max dimension across items.
+                // Weight is summed separately; dimensions are NOT multiplied by quantity, which
+                // previously inflated box size and could trigger dimensional-weight pricing.
+                $max_dimension = max( $max_dimension, $dim_value );
                 if ( $debug_mode ) {
-                    $debug_info['package_dimension_item'] = "Product: {$product->get_name()}, Dimension ($dimension): $dim_value, Quantity: $quantity, Adjusted: " . ($dim_value * $quantity);
+                    $debug_info['package_dimension_item'] = "Product: {$product->get_name()}, Dimension ($dimension): $dim_value";
                     set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-                    lsrwc_log( "Package dimension item ($dimension): Product={$product->get_name()}, Dimension=$dim_value, Quantity=$quantity, Adjusted=" . ($dim_value * $quantity) );
+                    lsrwc_log( "Package dimension item ($dimension): Product={$product->get_name()}, Dimension=$dim_value" );
                 }
             }
             $result = $max_dimension > 0 ? $max_dimension : 1; // Fallback to 1 inch

@@ -2,13 +2,17 @@
 /*
 Plugin Name: Live Shipping Rates for WooCommerce
 Description: Integrates UPS and USPS live shipping rates into WooCommerce with OAuth 2.0 authentication, including GUI debugging and live rate testing.
-Version: 1.1.22
+Version: 1.2.0
 Author: William Hare
 License: GPL2
+Requires at least: 5.6
+Requires PHP: 7.4
+WC requires at least: 7.0
+WC tested up to: 10.9
 GitHub Plugin URI: https://github.com/xboxhacker/live-shipping-rates-for-woocommerce
 */
 if ( ! defined( 'LSRWC_VERSION' ) ) {
-    define( 'LSRWC_VERSION', '1.1.22' );
+    define( 'LSRWC_VERSION', '1.2.0' );
 }
 
 if ( ! defined( 'LSRWC_PLUGIN_BASENAME' ) ) {
@@ -814,7 +818,7 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
         return array();
     }
 
-    $version = "v1";
+    $version = "v2409";
     $requestoption = "Rate";
     $url = "https://onlinetools.ups.com/api/rating/{$version}/{$requestoption}";
 
@@ -861,6 +865,12 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
                 "Service" => array(
                     "Code" => $service_code,
                     "Description" => $service_code === '11' ? 'UPS Standard' : 'Ground'
+                ),
+                // Request account/negotiated rates. If the account is authorized, UPS returns
+                // NegotiatedRateCharges (the discounted price actually paid) alongside published
+                // rates; otherwise only published rates come back.
+                "ShipmentRatingOptions" => array(
+                    "NegotiatedRatesIndicator" => "Y"
                 ),
                 "Package" => array(
                     array(
@@ -936,19 +946,33 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
     }
 
     $rates = array();
-    if ( isset( $response_body['RateResponse']['RatedShipment']['TotalCharges']['MonetaryValue'] ) ) {
-        $original_rate = floatval( $response_body['RateResponse']['RatedShipment']['TotalCharges']['MonetaryValue'] );
-        $percentage = $service_code === '11' ? ($settings['ups_international_percentage'] ?? 0) : ($settings['ups_percentage'] ?? 0);
-        $adjusted_rate = $original_rate * ( 1 + $percentage / 100 );
-        $service_name = $service_code === '11' ? 'UPS Standard' : 'UPS Ground';
-        $rates[$service_name] = array(
-            'original' => '$' . number_format( $original_rate, 2 ),
-            'adjusted' => '$' . number_format( $adjusted_rate, 2 )
-        );
-        if ( $debug_mode ) {
-            $debug_info['ups_rates_calculated'] = "Service: $service_name, Original Rate: $original_rate, Percentage: $percentage%, Adjusted Rate: $adjusted_rate";
-            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
-            lsrwc_log( "UPS rates calculated: Service=$service_name, Original Rate=$original_rate, Percentage=$percentage%, Adjusted Rate=$adjusted_rate" );
+    $rated_shipment = $response_body['RateResponse']['RatedShipment'] ?? null;
+    // UPS may return a list of RatedShipment objects; use the first entry.
+    if ( is_array( $rated_shipment ) && isset( $rated_shipment[0] ) ) {
+        $rated_shipment = $rated_shipment[0];
+    }
+    if ( is_array( $rated_shipment ) ) {
+        // Prefer the account's negotiated (discounted) charge when the account is authorized;
+        // otherwise fall back to published rates.
+        $negotiated_value = $rated_shipment['NegotiatedRateCharges']['TotalCharge']['MonetaryValue'] ?? null;
+        $published_value = $rated_shipment['TotalCharges']['MonetaryValue'] ?? null;
+        $monetary_value = ( $negotiated_value !== null && $negotiated_value !== '' ) ? $negotiated_value : $published_value;
+
+        if ( $monetary_value !== null ) {
+            $original_rate = floatval( $monetary_value );
+            $rate_basis = ( $negotiated_value !== null && $negotiated_value !== '' ) ? 'negotiated' : 'published';
+            $percentage = $service_code === '11' ? ($settings['ups_international_percentage'] ?? 0) : ($settings['ups_percentage'] ?? 0);
+            $adjusted_rate = $original_rate * ( 1 + $percentage / 100 );
+            $service_name = $service_code === '11' ? 'UPS Standard' : 'UPS Ground';
+            $rates[$service_name] = array(
+                'original' => '$' . number_format( $original_rate, 2 ),
+                'adjusted' => '$' . number_format( $adjusted_rate, 2 )
+            );
+            if ( $debug_mode ) {
+                $debug_info['ups_rates_calculated'] = "Service: $service_name, Rate basis: $rate_basis, Original Rate: $original_rate, Percentage: $percentage%, Adjusted Rate: $adjusted_rate";
+                set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+                lsrwc_log( "UPS rates calculated: Service=$service_name, Rate basis=$rate_basis, Original Rate=$original_rate, Percentage=$percentage%, Adjusted Rate=$adjusted_rate" );
+            }
         }
     }
 
@@ -1015,6 +1039,16 @@ function lsrwc_get_usps_processing_category( $weight, $length, $width, $height )
     );
 }
 
+function lsrwc_get_usps_rate_indicator( $length, $width, $height ) {
+    // USPS Ground Advantage - Commercial parcels are priced by weight as "Single-Piece" (SP).
+    // Only parcels EXCEEDING 1 cubic foot (1,728 cubic inches) are priced on dimensional
+    // weight using the "Dimensional Rectangular" (DR) indicator (DMM 283 section 1.0).
+    // Sending DR for normal small parcels forces the higher dimensional price, which is why
+    // quotes ran far above the commercial label price customers actually pay.
+    $cubic_inches = floatval( $length ) * floatval( $width ) * floatval( $height );
+    return ( $cubic_inches > 1728 ) ? 'DR' : 'SP';
+}
+
 // Fetch USPS rates
 function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height ) {
     $settings = get_option( 'lsrwc_settings', array() );
@@ -1038,6 +1072,7 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
 
     $processing_category_data = lsrwc_get_usps_processing_category( $weight, $length, $width, $height );
     $processing_category = $processing_category_data['category'];
+    $rate_indicator = lsrwc_get_usps_rate_indicator( $length, $width, $height );
 
     $url = 'https://apis.usps.com/prices/v3/base-rates/search';
     $body = array(
@@ -1050,8 +1085,9 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         'mailClass' => 'USPS_GROUND_ADVANTAGE',
         'processingCategory' => $processing_category,
         'destinationEntryFacilityType' => 'NONE',
-        'rateIndicator' => 'DR',
+        'rateIndicator' => $rate_indicator,
         'priceType' => 'COMMERCIAL',
+        'mailingDate' => gmdate( 'Y-m-d' ),
     );
 
     $args = array(
@@ -1065,7 +1101,9 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
 
     if ( $debug_mode ) {
         $category_note = empty( $processing_category_data['reasons'] ) ? 'Package within machinable thresholds.' : 'Reasons: ' . implode( '; ', $processing_category_data['reasons'] );
+        $cubic_feet = ( floatval( $length ) * floatval( $width ) * floatval( $height ) ) / 1728;
         $debug_info['usps_processing_category'] = "Processing category: $processing_category. $category_note Length+Girth: " . number_format( $processing_category_data['length_plus_girth'], 2 );
+        $debug_info['usps_rate_indicator'] = "Rate indicator: $rate_indicator (Single-Piece 'SP' is used at or below 1 cubic foot; Dimensional 'DR' only above). Package volume: " . number_format( $cubic_feet, 3 ) . " cubic feet.";
         $debug_info['usps_rate_request'] = "USPS rate request URL: $url\nBody: " . print_r( $body, true );
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
         lsrwc_log( "USPS rate request: URL=$url, Body=" . print_r( $body, true ) );
@@ -1379,7 +1417,7 @@ function lsrwc_github_plugin_information( $result, $action, $args ) {
         'homepage' => $release['html_url'] ?? $repo_url,
         'download_link' => lsrwc_prepare_github_package_url( $release, $parts ),
         'requires' => '5.6',
-        'tested' => '6.6',
+        'tested' => '7.0',
         'sections' => array(
             'description' => $description,
             'changelog' => $description,

@@ -7,10 +7,12 @@
 
 **Contributors:** xboxhacker  
 **Tags:** woocommerce, shipping, ups, usps, live-rates, oauth, api  
-**Requires at least:** 5.0  
-**Tested up to:** 6.6  
-**Stable tag:** 1.1.22  
-**Requires PHP:** 7.2  
+**Requires at least:** 5.6  
+**Tested up to:** 7.0  
+**Requires PHP:** 7.4  
+**WC requires at least:** 7.0  
+**WC tested up to:** 10.9  
+**Stable tag:** 1.2.0  
 **License:** GPL v2 or later  
 **License URI:** https://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -363,6 +365,14 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 
 ## Changelog
 
+### 1.2.0 - July 7, 2026
+- **Fixed USPS over-quoting**: USPS Ground Advantage now uses the Single-Piece (`SP`) rate indicator for parcels up to 1 cubic foot, and only uses Dimensional Rectangular (`DR`) for parcels exceeding 1 cubic foot, per USPS DMM 283. Previously every parcel was priced with `DR`, which forced dimensional pricing and quoted well above the commercial label price customers actually pay.
+- **UPS negotiated rates**: UPS requests now include `NegotiatedRatesIndicator` and prefer the account's negotiated (discounted) charge when authorized, falling back to published rates otherwise.
+- **UPS API version**: Updated the UPS Rating endpoint from `v1` to the current `v2409` release.
+- Added `mailingDate` to USPS price requests and surfaced the selected rate indicator and package cubic volume in the debug log.
+- **Fixed multi-quantity dimensions**: package dimensions now use the largest item's box (max dimension across items) instead of multiplying each dimension by quantity, which previously inflated box size and could wrongly trigger dimensional-weight pricing. Weight is still summed across all items.
+- Verified compatibility with WordPress 7.0 and WooCommerce 10.9; bumped supported-version headers and minimum PHP to 7.4.
+
 ### 1.1.22 - December 12, 2025
 - Added plugin version bump and repository metadata for WordPress update compatibility
 - Exposed GitHub Plugin URI in plugin header for third-party updater support
@@ -399,6 +409,9 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 - Comprehensive debugging and logging system
 
 ## Upgrade Notice
+
+### 1.2.0
+Important pricing fix. Corrects USPS Ground Advantage over-quoting (uses Single-Piece pricing for normal parcels instead of always applying dimensional pricing) and lets UPS return your account's negotiated rates. Tested with WordPress 7.0 and WooCommerce 10.9.
 
 ### 1.1.22
 This version adds GitHub auto-update support and improves documentation. Update for better maintenance workflow.
