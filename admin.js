@@ -19,6 +19,7 @@ jQuery(document).ready(function($) {
                 length: $form.find('#length').val(),
                 width: $form.find('#width').val(),
                 height: $form.find('#height').val(),
+                soft_pack: $form.find('#soft_pack').is(':checked') ? 1 : 0,
             },
             success: function(response) {
                 if (response.success) {

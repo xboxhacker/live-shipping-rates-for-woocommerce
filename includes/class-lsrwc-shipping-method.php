@@ -230,8 +230,12 @@ if ( ! class_exists( 'LSRWC_USPS_Shipping_Method' ) ) {
                 return array();
             }
 
+            // Determine whether this package should be quoted with soft-pack (bubble
+            // mailer/poly) cubic pricing based on its shipping class.
+            $is_soft_pack = lsrwc_package_is_soft_pack( $package );
+
             // Call the USPS rate fetching function with aggregated weight
-            $rates = lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height );
+            $rates = lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack );
 
             $formatted_rates = array();
             foreach ( $rates as $service => $cost ) {

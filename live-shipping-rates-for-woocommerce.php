@@ -2,7 +2,7 @@
 /*
 Plugin Name: Live Shipping Rates for WooCommerce
 Description: Integrates UPS and USPS live shipping rates into WooCommerce with OAuth 2.0 authentication, including GUI debugging and live rate testing.
-Version: 1.2.1
+Version: 1.4.0
 Author: William Hare
 License: GPL2
 Requires at least: 5.6
@@ -12,7 +12,7 @@ WC tested up to: 10.9
 GitHub Plugin URI: https://github.com/xboxhacker/live-shipping-rates-for-woocommerce
 */
 if ( ! defined( 'LSRWC_VERSION' ) ) {
-    define( 'LSRWC_VERSION', '1.2.1' );
+    define( 'LSRWC_VERSION', '1.4.0' );
 }
 
 if ( ! defined( 'LSRWC_PLUGIN_BASENAME' ) ) {
@@ -263,6 +263,8 @@ function lsrwc_register_settings() {
     add_settings_field( 'ups_account_number', 'UPS Account Number', 'lsrwc_ups_account_number_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'usps_consumer_key', 'USPS Consumer Key', 'lsrwc_usps_consumer_key_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'usps_consumer_secret', 'USPS Consumer Secret', 'lsrwc_usps_consumer_secret_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'use_veeqo', 'Rate Source: Use Veeqo (Amazon) Rates', 'lsrwc_use_veeqo_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'veeqo_api_key', 'Veeqo API Key', 'lsrwc_veeqo_api_key_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'origin_zip', 'Origin ZIP Code', 'lsrwc_origin_zip_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'origin_city', 'Origin City', 'lsrwc_origin_city_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'origin_state', 'Origin State', 'lsrwc_origin_state_field', 'live-shipping-rates', 'lsrwc_main_section' );
@@ -272,6 +274,7 @@ function lsrwc_register_settings() {
     add_settings_field( 'usps_percentage', 'USPS Percentage Increase (%)', 'lsrwc_usps_percentage_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'ups_shipping_class_slug', 'UPS Shipping Class Slug', 'lsrwc_ups_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'usps_shipping_class_slug', 'USPS Shipping Class Slug', 'lsrwc_usps_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
+    add_settings_field( 'usps_softpack_shipping_class_slug', 'USPS Soft Pack Shipping Class Slug', 'lsrwc_usps_softpack_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'free_shipping_class_slug', 'Free Shipping Class Slug', 'lsrwc_free_shipping_class_slug_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'debug_mode', 'Enable Extensive Debugging', 'lsrwc_debug_mode_field', 'live-shipping-rates', 'lsrwc_main_section' );
     add_settings_field( 'github_enable_updates', 'Enable GitHub Auto Updates', 'lsrwc_github_enable_updates_field', 'live-shipping-rates', 'lsrwc_main_section' );
@@ -288,6 +291,8 @@ function lsrwc_sanitize_settings( $input ) {
     $sanitized['ups_account_number'] = sanitize_text_field( $input['ups_account_number'] ?? '' );
     $sanitized['usps_consumer_key'] = sanitize_text_field( $input['usps_consumer_key'] ?? '' );
     $sanitized['usps_consumer_secret'] = sanitize_text_field( $input['usps_consumer_secret'] ?? '' );
+    $sanitized['use_veeqo'] = ! empty( $input['use_veeqo'] ) ? 1 : 0;
+    $sanitized['veeqo_api_key'] = sanitize_text_field( $input['veeqo_api_key'] ?? '' );
     $sanitized['origin_zip'] = sanitize_text_field( $input['origin_zip'] ?? '' );
     $sanitized['origin_city'] = sanitize_text_field( $input['origin_city'] ?? '' );
     $sanitized['origin_state'] = sanitize_text_field( $input['origin_state'] ?? '' );
@@ -297,6 +302,7 @@ function lsrwc_sanitize_settings( $input ) {
     $sanitized['usps_percentage'] = floatval( $input['usps_percentage'] ?? 0 );
     $sanitized['ups_shipping_class_slug'] = sanitize_text_field( $input['ups_shipping_class_slug'] ?? '' );
     $sanitized['usps_shipping_class_slug'] = sanitize_text_field( $input['usps_shipping_class_slug'] ?? '' );
+    $sanitized['usps_softpack_shipping_class_slug'] = sanitize_text_field( $input['usps_softpack_shipping_class_slug'] ?? '' );
     $sanitized['free_shipping_class_slug'] = sanitize_text_field( $input['free_shipping_class_slug'] ?? '' );
     $sanitized['debug_mode'] = isset( $input['debug_mode'] ) ? 1 : 0;
     $sanitized['github_enable_updates'] = isset( $input['github_enable_updates'] ) ? 1 : 0;
@@ -368,6 +374,8 @@ function lsrwc_settings_page() {
                     <input type="number" step="0.01" id="width" name="width"><br>
                     <label for="height">Height (in):</label>
                     <input type="number" step="0.01" id="height" name="height"><br>
+                    <label for="soft_pack">Soft pack (bubble mailer/poly):</label>
+                    <input type="checkbox" id="soft_pack" name="soft_pack" value="1"><br>
                     <button type="submit" class="button">Get Rates</button>
                 </form>
                 <div id="rates-result"></div>
@@ -423,6 +431,20 @@ function lsrwc_usps_consumer_secret_field() {
     echo "<input type='text' name='lsrwc_settings[usps_consumer_secret]' value='" . esc_attr( $value ) . "' class='regular-text'>";
 }
 
+function lsrwc_use_veeqo_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $checked = ! empty( $settings['use_veeqo'] ) ? 'checked' : '';
+    echo "<label><input type='checkbox' name='lsrwc_settings[use_veeqo]' value='1' $checked> Fetch live UPS/USPS rates from Veeqo (Amazon Shipping) instead of the direct UPS/USPS APIs.</label>";
+    echo '<p class="description">When checked, both UPS and USPS quotes are pulled from your Veeqo account (Amazon-negotiated rates) and require the Veeqo API Key below. When unchecked, the plugin uses the direct UPS and USPS APIs. Note: Veeqo rate shopping is US domestic only; international/Canada UPS quotes always use the direct UPS API.</p>';
+}
+
+function lsrwc_veeqo_api_key_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $value = $settings['veeqo_api_key'] ?? '';
+    echo "<input type='text' name='lsrwc_settings[veeqo_api_key]' value='" . esc_attr( $value ) . "' class='regular-text' autocomplete='off'>";
+    echo '<p class="description">Your Veeqo private API key (Veeqo App: Employees &rarr; your user &rarr; Refresh API Key). Sent as the <code>x-api-key</code> request header. Only used when "Use Veeqo (Amazon) Rates" is checked.</p>';
+}
+
 function lsrwc_origin_zip_field() {
     $settings = get_option( 'lsrwc_settings', array() );
     $value = $settings['origin_zip'] ?? '';
@@ -475,6 +497,13 @@ function lsrwc_usps_shipping_class_slug_field() {
     $settings = get_option( 'lsrwc_settings', array() );
     $value = $settings['usps_shipping_class_slug'] ?? '';
     echo "<input type='text' name='lsrwc_settings[usps_shipping_class_slug]' value='" . esc_attr( $value ) . "' class='regular-text' placeholder='e.g., usps-shipping'>";
+}
+
+function lsrwc_usps_softpack_shipping_class_slug_field() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $value = $settings['usps_softpack_shipping_class_slug'] ?? '';
+    echo "<input type='text' name='lsrwc_settings[usps_softpack_shipping_class_slug]' value='" . esc_attr( $value ) . "' class='regular-text' placeholder='e.g., usps-softpack'>";
+    echo '<p class="description">Products in this class are quoted USPS Ground Advantage soft-pack (bubble mailer/poly) cubic pricing. Boxes should NOT use this class. Leave blank to disable soft-pack pricing.</p>';
 }
 
 function lsrwc_free_shipping_class_slug_field() {
@@ -707,9 +736,10 @@ function lsrwc_test_rates_ajax() {
     $length = floatval( $_POST['length'] ?? 0 );
     $width = floatval( $_POST['width'] ?? 0 );
     $height = floatval( $_POST['height'] ?? 0 );
+    $is_soft_pack = ! empty( $_POST['soft_pack'] ) && $_POST['soft_pack'] !== '0' && $_POST['soft_pack'] !== 'false';
 
     if ( $debug_mode ) {
-        $debug_info['test_rates_inputs'] = "City: $city, State: $state, ZIP: $zip, Country: $country, Weight: $weight, Length: $length, Width: $width, Height: $height";
+        $debug_info['test_rates_inputs'] = "City: $city, State: $state, ZIP: $zip, Country: $country, Weight: $weight, Length: $length, Width: $width, Height: $height, Soft pack: " . ( $is_soft_pack ? 'yes' : 'no' );
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
         lsrwc_log( "Test rates inputs: " . $debug_info['test_rates_inputs'] );
     }
@@ -732,7 +762,7 @@ function lsrwc_test_rates_ajax() {
     } else {
         // For US, test UPS Ground and USPS
         $rates['ups'] = lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length, $width, $height, '03' );
-        $rates['usps'] = lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height );
+        $rates['usps'] = lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack );
     }
 
     if ( $debug_mode ) {
@@ -802,6 +832,14 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
     $settings = get_option( 'lsrwc_settings', array() );
     $debug_mode = $settings['debug_mode'] ?? 0;
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    // When Veeqo is the selected rate source, pull UPS Ground from Veeqo (Amazon
+    // Shipping) for domestic shipments. Veeqo rate shopping is US domestic only, so
+    // international/Canada quotes (service code 11) still use the direct UPS API.
+    if ( $service_code !== '11' && lsrwc_use_veeqo_rates() ) {
+        return lsrwc_fetch_ups_rates_veeqo( $city, $state, $zip, $weight, $length, $width, $height );
+    }
+
     $token = lsrwc_get_ups_access_token();
     if ( ! $token ) {
         if ( $debug_mode ) {
@@ -1075,7 +1113,42 @@ function lsrwc_get_usps_rate_option_price( $option ) {
     return $price;
 }
 
-function lsrwc_select_lowest_usps_ground_advantage_option( $rate_options ) {
+function lsrwc_is_usps_soft_pack_rate( $rate ) {
+    if ( ! is_array( $rate ) ) {
+        return false;
+    }
+
+    // Cubic soft-pack tier rate indicators (DMM 283 / USPS SSF rate ingredients).
+    $soft_pack_indicators = array( 'P5', 'P6', 'P7', 'P8', 'P9', 'Q6', 'Q7', 'Q8', 'Q9', 'Q0' );
+    $indicator = strtoupper( trim( $rate['rateIndicator'] ?? '' ) );
+    if ( in_array( $indicator, $soft_pack_indicators, true ) ) {
+        return true;
+    }
+
+    return stripos( $rate['description'] ?? '', 'soft pack' ) !== false;
+}
+
+function lsrwc_is_usps_box_cubic_rate( $rate ) {
+    if ( ! is_array( $rate ) ) {
+        return false;
+    }
+
+    // Soft-pack cubic is handled separately; only classify true box cubic here.
+    if ( lsrwc_is_usps_soft_pack_rate( $rate ) ) {
+        return false;
+    }
+
+    // Non-soft-pack cubic rate indicators: CP and cubic pricing tiers C1-C5.
+    $box_cubic_indicators = array( 'CP', 'C1', 'C2', 'C3', 'C4', 'C5' );
+    $indicator = strtoupper( trim( $rate['rateIndicator'] ?? '' ) );
+    if ( in_array( $indicator, $box_cubic_indicators, true ) ) {
+        return true;
+    }
+
+    return stripos( $rate['description'] ?? '', 'cubic' ) !== false;
+}
+
+function lsrwc_select_lowest_usps_ground_advantage_option( $rate_options, $is_soft_pack = false ) {
     $lowest_price = null;
     $selected_option = null;
     $selected_rate = null;
@@ -1096,6 +1169,22 @@ function lsrwc_select_lowest_usps_ground_advantage_option( $rate_options ) {
         foreach ( $option['rates'] as $rate ) {
             if ( ( $rate['mailClass'] ?? '' ) !== 'USPS_GROUND_ADVANTAGE' ) {
                 continue;
+            }
+
+            // Only quote cubic pricing the shipment can actually purchase, matched to the
+            // physical package type:
+            //   - Soft-pack shipments (bubble mailers/poly) => single-piece + soft-pack cubic,
+            //     never box cubic.
+            //   - Everything else (boxes) => single-piece + box cubic, never soft-pack cubic.
+            // This keeps quotes to rates you can actually buy for the given package.
+            if ( $is_soft_pack ) {
+                if ( lsrwc_is_usps_box_cubic_rate( $rate ) ) {
+                    continue;
+                }
+            } else {
+                if ( lsrwc_is_usps_soft_pack_rate( $rate ) ) {
+                    continue;
+                }
             }
 
             $price = lsrwc_get_usps_rate_option_price( $option );
@@ -1172,10 +1261,17 @@ function lsrwc_fetch_usps_rates_single( $token, $body, $debug_mode = false ) {
 }
 
 // Fetch USPS rates
-function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height ) {
+function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack = false ) {
     $settings = get_option( 'lsrwc_settings', array() );
     $debug_mode = $settings['debug_mode'] ?? 0;
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    // When Veeqo is the selected rate source, pull USPS Ground Advantage from Veeqo
+    // (Amazon Shipping) instead of the direct USPS API.
+    if ( lsrwc_use_veeqo_rates() ) {
+        return lsrwc_fetch_usps_rates_veeqo( $city, $state, $zip, $weight, $length, $width, $height );
+    }
+
     $token = lsrwc_get_usps_access_token();
     if ( ! $token ) {
         if ( $debug_mode ) {
@@ -1228,6 +1324,7 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
         $category_note = empty( $processing_category_data['reasons'] ) ? 'Package within machinable thresholds.' : 'Reasons: ' . implode( '; ', $processing_category_data['reasons'] );
         $debug_info['usps_processing_category'] = "Processing category: $processing_category. $category_note Length+Girth: " . number_format( $processing_category_data['length_plus_girth'], 2 );
         $debug_info['usps_rate_indicator'] = "Fallback single-rate indicator: $rate_indicator. Package volume: " . number_format( $cubic_feet, 3 ) . " cubic feet.";
+        $debug_info['usps_packaging_mode'] = 'Packaging mode: ' . ( $is_soft_pack ? 'SOFT PACK (single-piece + soft-pack cubic)' : 'BOX (single-piece + box cubic)' ) . '.';
         $debug_info['usps_rate_request'] = "USPS rate request URL: $url\nBody: " . print_r( $body, true );
         set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
         lsrwc_log( "USPS rate request: URL=$url, Body=" . print_r( $body, true ) );
@@ -1260,7 +1357,7 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
     );
 
     if ( $response_code === 200 && ! empty( $response_body['rateOptions'] ) ) {
-        $selected = lsrwc_select_lowest_usps_ground_advantage_option( $response_body['rateOptions'] );
+        $selected = lsrwc_select_lowest_usps_ground_advantage_option( $response_body['rateOptions'], $is_soft_pack );
         $selected['source'] = 'base-rates-list';
     }
 
@@ -1339,6 +1436,232 @@ function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, 
     return $rates;
 }
 
+// ---------------------------------------------------------------------------
+// Veeqo (Amazon Shipping) rate source
+// ---------------------------------------------------------------------------
+
+// Returns true when the plugin is configured to fetch rates from Veeqo.
+function lsrwc_use_veeqo_rates() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    return ! empty( $settings['use_veeqo'] ) && ! empty( trim( $settings['veeqo_api_key'] ?? '' ) );
+}
+
+// Normalize a Veeqo quote's sub-carrier (usps, ups, fedex, ...).
+function lsrwc_veeqo_quote_carrier( $quote ) {
+    if ( ! is_array( $quote ) ) {
+        return '';
+    }
+    $carrier = $quote['service_carrier'] ?? $quote['carrier_id'] ?? $quote['carrier'] ?? '';
+    return strtolower( trim( (string) $carrier ) );
+}
+
+// Get a Veeqo quote's base price (before optional value-added services).
+function lsrwc_veeqo_quote_price( $quote ) {
+    if ( ! is_array( $quote ) ) {
+        return null;
+    }
+    $price = $quote['base_rate'] ?? $quote['total_charge'] ?? null;
+    if ( $price === null || $price === '' ) {
+        return null;
+    }
+    return floatval( $price );
+}
+
+// Fetch all Veeqo shipping quotes for a shipment. Results are cached per request
+// so the USPS and UPS shipping methods don't each trigger a separate API call.
+function lsrwc_fetch_veeqo_quotes( $city, $state, $zip, $country, $weight, $length, $width, $height ) {
+    static $cache = array();
+
+    $settings = get_option( 'lsrwc_settings', array() );
+    $debug_mode = $settings['debug_mode'] ?? 0;
+    $api_key = trim( $settings['veeqo_api_key'] ?? '' );
+
+    if ( empty( $api_key ) ) {
+        lsrwc_set_last_notice( 'veeqo_rates_last_notice', 'Veeqo API key is not set.' );
+        return array();
+    }
+
+    $country = $country ?: 'US';
+    $cache_key = md5( implode( '|', array( $city, $state, $zip, $country, $weight, $length, $width, $height ) ) );
+    if ( isset( $cache[ $cache_key ] ) ) {
+        return $cache[ $cache_key ];
+    }
+
+    $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    $body = array(
+        'to_address' => array(
+            'name' => 'Customer',
+            'line1' => 'N/A',
+            'town' => $city ?: 'N/A',
+            'postcode' => $zip,
+            'country_code' => $country,
+            'county' => $state,
+        ),
+        'from_address' => array(
+            'name' => get_bloginfo( 'name' ) ?: 'Store',
+            'line1' => $settings['origin_address1'] ?? 'N/A',
+            'town' => $settings['origin_city'] ?? 'N/A',
+            'postcode' => $settings['origin_zip'] ?? '',
+            'country_code' => 'US',
+            'county' => $settings['origin_state'] ?? '',
+        ),
+        'parcels' => array(
+            array(
+                'weight' => floatval( $weight ),
+                'weight_unit' => 'lb',
+                'length' => floatval( $length ),
+                'width' => floatval( $width ),
+                'height' => floatval( $height ),
+                'dimension_unit' => 'in',
+            ),
+        ),
+        'customer_reference' => 'WC-LiveRates-' . gmdate( 'YmdHis' ),
+    );
+
+    $url = 'https://api.veeqo.com/shipping/api/v1/rates';
+    $args = array(
+        'method' => 'POST',
+        'timeout' => 20,
+        'headers' => array(
+            'x-api-key' => $api_key,
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ),
+        'body' => wp_json_encode( $body ),
+    );
+
+    if ( $debug_mode ) {
+        $debug_info['veeqo_rate_request'] = "Veeqo rate request URL: $url\nBody: " . print_r( $body, true );
+        set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+        lsrwc_log( "Veeqo rate request: URL=$url, Body=" . wp_json_encode( $body ) );
+    }
+
+    $response = wp_remote_post( $url, $args );
+
+    if ( is_wp_error( $response ) ) {
+        if ( $debug_mode ) {
+            $debug_info['veeqo_rates_error'] = 'Veeqo request error: ' . $response->get_error_message();
+            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+            lsrwc_log( 'Veeqo request error: ' . $response->get_error_message(), 'ERROR' );
+        }
+        lsrwc_set_last_notice( 'veeqo_rates_last_notice', 'Veeqo request error: ' . $response->get_error_message() );
+        $cache[ $cache_key ] = array();
+        return array();
+    }
+
+    $code = wp_remote_retrieve_response_code( $response );
+    $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    if ( $debug_mode ) {
+        $debug_info['veeqo_rate_response'] = "Veeqo rate response (Code: $code): " . print_r( $decoded, true );
+        set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+        lsrwc_log( "Veeqo rate response: Code=$code, Body=" . print_r( $decoded, true ) );
+    }
+
+    if ( $code !== 200 || empty( $decoded['quotes'] ) || ! is_array( $decoded['quotes'] ) ) {
+        $err = '';
+        if ( ! empty( $decoded['error_messages'] ) && is_array( $decoded['error_messages'] ) ) {
+            $err = ' ' . implode( '; ', $decoded['error_messages'] );
+        }
+        lsrwc_set_last_notice( 'veeqo_rates_last_notice', "Veeqo returned no quotes (HTTP $code).$err" );
+        $cache[ $cache_key ] = array();
+        return array();
+    }
+
+    $cache[ $cache_key ] = $decoded['quotes'];
+    return $decoded['quotes'];
+}
+
+// Select the lowest-priced Veeqo quote for a given sub-carrier whose service name
+// contains $service_match. Returns array( price, service_name ) or nulls.
+function lsrwc_select_lowest_veeqo_rate( $quotes, $carrier, $service_match = '' ) {
+    $lowest = null;
+    $chosen = '';
+    foreach ( (array) $quotes as $quote ) {
+        if ( lsrwc_veeqo_quote_carrier( $quote ) !== $carrier ) {
+            continue;
+        }
+        $name = $quote['service_name'] ?? '';
+        if ( $service_match !== '' && stripos( $name, $service_match ) === false ) {
+            continue;
+        }
+        $price = lsrwc_veeqo_quote_price( $quote );
+        if ( $price === null || $price <= 0 ) {
+            continue;
+        }
+        if ( $lowest === null || $price < $lowest ) {
+            $lowest = $price;
+            $chosen = $name;
+        }
+    }
+    return array( 'price' => $lowest, 'service_name' => $chosen );
+}
+
+// USPS Ground Advantage via Veeqo. Returns rates in the same shape as lsrwc_fetch_usps_rates().
+function lsrwc_fetch_usps_rates_veeqo( $city, $state, $zip, $weight, $length, $width, $height ) {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $debug_mode = $settings['debug_mode'] ?? 0;
+    $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    $quotes = lsrwc_fetch_veeqo_quotes( $city, $state, $zip, 'US', $weight, $length, $width, $height );
+    $selected = lsrwc_select_lowest_veeqo_rate( $quotes, 'usps', 'Ground Advantage' );
+
+    $rates = array();
+    if ( $selected['price'] !== null ) {
+        $original_rate = floatval( $selected['price'] );
+        $percentage = $settings['usps_percentage'] ?? 0;
+        $adjusted_rate = $original_rate * ( 1 + $percentage / 100 );
+        $rates['USPS Ground Advantage'] = array(
+            'original' => '$' . number_format( $original_rate, 2 ),
+            'adjusted' => '$' . number_format( $adjusted_rate, 2 ),
+        );
+        if ( $debug_mode ) {
+            $debug_info['usps_rates_calculated'] = "Service: USPS Ground Advantage, Source: veeqo ({$selected['service_name']}), Original Rate: $original_rate, Percentage: $percentage%, Adjusted Rate: $adjusted_rate";
+            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+            lsrwc_log( "USPS rates calculated (Veeqo): Service={$selected['service_name']}, Original Rate=$original_rate, Percentage=$percentage%, Adjusted Rate=$adjusted_rate" );
+        }
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'Veeqo returned USPS Ground Advantage rate.' );
+    } else {
+        lsrwc_set_last_notice( 'usps_rates_last_notice', 'Veeqo did not return a USPS Ground Advantage rate.' );
+    }
+
+    return $rates;
+}
+
+// UPS Ground via Veeqo. Returns rates in the same shape as lsrwc_fetch_ups_rates().
+function lsrwc_fetch_ups_rates_veeqo( $city, $state, $zip, $weight, $length, $width, $height ) {
+    $settings = get_option( 'lsrwc_settings', array() );
+    $debug_mode = $settings['debug_mode'] ?? 0;
+    $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    $quotes = lsrwc_fetch_veeqo_quotes( $city, $state, $zip, 'US', $weight, $length, $width, $height );
+    $selected = lsrwc_select_lowest_veeqo_rate( $quotes, 'ups', 'Ground' );
+
+    $rates = array();
+    if ( $selected['price'] !== null ) {
+        $original_rate = floatval( $selected['price'] );
+        $percentage = $settings['ups_percentage'] ?? 0;
+        $adjusted_rate = $original_rate * ( 1 + $percentage / 100 );
+        $rates['UPS Ground'] = array(
+            'original' => '$' . number_format( $original_rate, 2 ),
+            'adjusted' => '$' . number_format( $adjusted_rate, 2 ),
+        );
+        if ( $debug_mode ) {
+            $debug_info['ups_rates_calculated'] = "Service: UPS Ground, Source: veeqo ({$selected['service_name']}), Original Rate: $original_rate, Percentage: $percentage%, Adjusted Rate: $adjusted_rate";
+            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+            lsrwc_log( "UPS rates calculated (Veeqo): Service={$selected['service_name']}, Original Rate=$original_rate, Percentage=$percentage%, Adjusted Rate=$adjusted_rate" );
+        }
+    } else {
+        if ( $debug_mode ) {
+            $debug_info['ups_rates_error'] = 'Veeqo did not return a UPS Ground rate.';
+            set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+        }
+    }
+
+    return $rates;
+}
+
 // Clear Debug AJAX Handler
 function lsrwc_clear_debug_ajax() {
     check_ajax_referer( 'lsrwc_nonce', 'nonce' );
@@ -1388,6 +1711,43 @@ function lsrwc_set_last_notice( $key, $message ) {
 function lsrwc_get_free_shipping_class_slug() {
     $settings = get_option( 'lsrwc_settings', array() );
     return $settings['free_shipping_class_slug'] ?? '';
+}
+
+function lsrwc_get_softpack_shipping_class_slug() {
+    $settings = get_option( 'lsrwc_settings', array() );
+    return $settings['usps_softpack_shipping_class_slug'] ?? '';
+}
+
+/**
+ * Determine if a package should be quoted with USPS soft-pack (bubble mailer/poly)
+ * cubic pricing. Returns true only when every chargeable item belongs to the soft-pack
+ * shipping class; mixed carts (a box + a mailer) fall back to box pricing, which is the
+ * safer/higher quote and a rate the shipment can actually purchase.
+ */
+function lsrwc_package_is_soft_pack( $package ) {
+    $slug = lsrwc_get_softpack_shipping_class_slug();
+    if ( empty( $slug ) || empty( $package['contents'] ) ) {
+        return false;
+    }
+    $free_slug = lsrwc_get_free_shipping_class_slug();
+    $has_soft_pack = false;
+    $has_other = false;
+    foreach ( $package['contents'] as $item ) {
+        $product = $item['data'] ?? null;
+        if ( ! $product || ! method_exists( $product, 'get_shipping_class' ) ) {
+            continue;
+        }
+        $shipping_class = $product->get_shipping_class();
+        if ( $free_slug && $shipping_class === $free_slug ) {
+            continue; // Free items don't influence packaging type.
+        }
+        if ( $shipping_class === $slug ) {
+            $has_soft_pack = true;
+        } else {
+            $has_other = true;
+        }
+    }
+    return $has_soft_pack && ! $has_other;
 }
 
 function lsrwc_package_has_free_shipping_class( $package ) {
@@ -1630,6 +1990,7 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
     $ups_slug = $settings['ups_shipping_class_slug'] ?? '';
     $usps_slug = $settings['usps_shipping_class_slug'] ?? '';
+    $usps_softpack_slug = $settings['usps_softpack_shipping_class_slug'] ?? '';
     $has_free_items = lsrwc_package_has_free_shipping_class( $package );
     $has_chargeable_items = lsrwc_package_has_chargeable_items( $package );
     $has_free_shipping_coupon = lsrwc_cart_has_free_shipping_coupon();
@@ -1683,10 +2044,12 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
             'product' => $product->get_name(),
             'shipping_class' => $shipping_class ?: '(none)'
         );
-        if ( $shipping_class === $ups_slug ) {
+        if ( $ups_slug && $shipping_class === $ups_slug ) {
             $has_ups_slug = true;
         }
-        if ( $shipping_class === $usps_slug ) {
+        // The soft-pack class is a USPS class for visibility purposes: it must show USPS
+        // (and hide UPS) exactly like the standard USPS class.
+        if ( ( $usps_slug && $shipping_class === $usps_slug ) || ( $usps_softpack_slug && $shipping_class === $usps_softpack_slug ) ) {
             $has_usps_slug = true;
         }
         // Optimization: stop looping if both slugs are found

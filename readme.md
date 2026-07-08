@@ -12,7 +12,7 @@
 **Requires PHP:** 7.4  
 **WC requires at least:** 7.0  
 **WC tested up to:** 10.9  
-**Stable tag:** 1.2.1  
+**Stable tag:** 1.4.0  
 **License:** GPL v2 or later  
 **License URI:** https://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -365,6 +365,15 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 
 ## Changelog
 
+### 1.4.0 - July 8, 2026
+- **New rate source: Veeqo (Amazon Shipping)**. Added a **Use Veeqo (Amazon) Rates** checkbox and a **Veeqo API Key** field in settings. When enabled, UPS and USPS live quotes are pulled from your Veeqo account's Amazon-negotiated rates (via the Veeqo Rate Shopping API, `POST /shipping/api/v1/rates`) instead of the direct UPS/USPS APIs, so cart quotes match the rates you actually pay when buying labels in Veeqo. The plugin picks the lowest USPS Ground Advantage quote and the lowest UPS Ground quote and applies your existing percentage markups.
+- Leaving the checkbox unchecked keeps the original direct UPS/USPS API behavior unchanged. Veeqo rate shopping is US domestic only; international/Canada UPS quotes always use the direct UPS API.
+
+### 1.3.0 - July 8, 2026
+- **USPS cubic pricing matched to package type**: added a new **USPS Soft Pack Shipping Class Slug** setting. Products in that class (bubble mailers / poly) are quoted single-piece plus **soft-pack** cubic pricing, while all other products (boxes) are quoted single-piece plus **box** cubic pricing. This prevents quoting a cubic rate the shipment can't actually purchase (a box can't buy soft-pack cubic, and vice-versa). Mixed carts fall back to box pricing (the safer/higher quote).
+- The Test Live Rates tab now has a **Soft pack** checkbox so both pricing paths can be tested, and the debug log reports the packaging mode used for each USPS quote.
+- The soft-pack class is now treated as a USPS class for method visibility: a soft-pack item in the cart shows only USPS and hides UPS, exactly like the standard USPS shipping class (previously it fell through and showed all carriers).
+
 ### 1.2.1 - July 7, 2026
 - **USPS cheapest-rate selection**: Ground Advantage now uses the `base-rates-list` API to return all eligible commercial options (single-piece, cubic tiers, etc.) and quotes the lowest price, matching how USPS.com and label purchase tools select rates. Falls back to the single-rate endpoint if the list call fails.
 - Debug output now includes the selected rate source, indicator, and description.
@@ -413,6 +422,12 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 - Comprehensive debugging and logging system
 
 ## Upgrade Notice
+
+### 1.4.0
+Adds an optional Veeqo (Amazon Shipping) rate source. Check "Use Veeqo (Amazon) Rates" and enter your Veeqo API key to quote the same Amazon-negotiated UPS/USPS rates you pay in Veeqo. Leave it unchecked to keep using the direct UPS/USPS APIs.
+
+### 1.3.0
+Adds a USPS Soft Pack Shipping Class so bubble mailers are quoted soft-pack cubic and boxes are quoted box cubic, keeping quotes to rates you can actually buy. Assign the new shipping class to your bubble-mailer products and set its slug under Live Shipping Rates settings.
 
 ### 1.2.1
 Further USPS pricing fix: quotes the cheapest eligible Ground Advantage commercial option (including cubic pricing for small parcels) instead of only the weight-based single-piece rate.
