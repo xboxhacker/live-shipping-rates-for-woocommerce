@@ -2,7 +2,7 @@
 /*
 Plugin Name: Live Shipping Rates for WooCommerce
 Description: Integrates UPS and USPS live shipping rates into WooCommerce with OAuth 2.0 authentication, including GUI debugging and live rate testing.
-Version: 1.4.0
+Version: 1.4.1
 Author: William Hare
 License: GPL2
 Requires at least: 5.6
@@ -12,7 +12,7 @@ WC tested up to: 10.9
 GitHub Plugin URI: https://github.com/xboxhacker/live-shipping-rates-for-woocommerce
 */
 if ( ! defined( 'LSRWC_VERSION' ) ) {
-    define( 'LSRWC_VERSION', '1.4.0' );
+    define( 'LSRWC_VERSION', '1.4.1' );
 }
 
 if ( ! defined( 'LSRWC_PLUGIN_BASENAME' ) ) {
@@ -53,6 +53,10 @@ function lsrwc_init() {
         add_filter( 'woocommerce_shipping_methods', 'lsrwc_add_shipping_methods' );
         // Filter shipping methods based on cart contents
         add_filter( 'woocommerce_package_rates', 'lsrwc_filter_shipping_methods', 10, 2 );
+        // Treat US territories (PR, GU, VI, etc.) as US states at checkout so
+        // customers can pick United States → Puerto Rico. Carriers still receive
+        // carrier-specific country/state formatting via lsrwc_normalize_destination_for_carrier().
+        add_filter( 'woocommerce_states', 'lsrwc_add_us_territory_states' );
         // Force shipping calculation on checkout
         add_action( 'woocommerce_checkout_update_order_review', 'lsrwc_force_shipping_recalculation' );
         add_filter( 'woocommerce_shipping_packages', 'lsrwc_ensure_shipping_destination', 10, 1 );
@@ -61,6 +65,134 @@ function lsrwc_init() {
     }
 }
 add_action( 'plugins_loaded', 'lsrwc_init' );
+
+/**
+ * US territories WooCommerce lists as countries, but USPS treats as domestic US states.
+ *
+ * @return array<string, string> Territory ISO code => label.
+ */
+function lsrwc_get_us_territory_codes() {
+    return array(
+        'PR' => __( 'Puerto Rico', 'lsrwc' ),
+        'VI' => __( 'U.S. Virgin Islands', 'lsrwc' ),
+        'GU' => __( 'Guam', 'lsrwc' ),
+        'AS' => __( 'American Samoa', 'lsrwc' ),
+        'MP' => __( 'Northern Mariana Islands', 'lsrwc' ),
+    );
+}
+
+/**
+ * Detect a US territory from WooCommerce destination fields.
+ *
+ * Customers often select Country = "Puerto Rico" (ISO PR). Some select
+ * Country = United States with state PR when territories are registered as states.
+ * ZIP prefixes are used as a fallback (006/007/009 = PR, 008 = VI).
+ *
+ * @param string $state   State / province code.
+ * @param string $zip     Postal code.
+ * @param string $country Country code.
+ * @return string Empty string, or a territory code such as PR.
+ */
+function lsrwc_detect_us_territory( $state, $zip, $country ) {
+    $territories = lsrwc_get_us_territory_codes();
+    $country     = strtoupper( trim( (string) $country ) );
+    $state       = strtoupper( trim( (string) $state ) );
+
+    if ( isset( $territories[ $country ] ) ) {
+        return $country;
+    }
+
+    if ( ( $country === 'US' || $country === '' ) && isset( $territories[ $state ] ) ) {
+        return $state;
+    }
+
+    $zip5 = substr( preg_replace( '/\D/', '', (string) $zip ), 0, 5 );
+    if ( strlen( $zip5 ) === 5 && ( $country === 'US' || $country === '' || isset( $territories[ $country ] ) ) ) {
+        if ( strpos( $zip5, '008' ) === 0 ) {
+            return 'VI';
+        }
+        if ( preg_match( '/^00[679]/', $zip5 ) ) {
+            return 'PR';
+        }
+        if ( preg_match( '/^9695[0-2]/', $zip5 ) ) {
+            return 'MP';
+        }
+        if ( preg_match( '/^969(1[0-9]|2[0-9]|3[0-2])$/', $zip5 ) ) {
+            return 'GU';
+        }
+        if ( $zip5 === '96799' ) {
+            return 'AS';
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Normalize destination country/state for a carrier rate request.
+ *
+ * USPS and Veeqo/Amazon expect Country=US and State=PR (domestic).
+ * UPS Rating expects CountryCode=PR (territory) with StateProvinceCode=PR.
+ *
+ * @param string $city    City.
+ * @param string $state   State.
+ * @param string $zip     Postal code.
+ * @param string $country Country.
+ * @param string $carrier One of: usps, ups, veeqo.
+ * @return array{city:string,state:string,zip:string,country:string}
+ */
+function lsrwc_normalize_destination_for_carrier( $city, $state, $zip, $country, $carrier = 'usps' ) {
+    $city    = (string) $city;
+    $state   = (string) $state;
+    $zip     = (string) $zip;
+    $country = (string) $country;
+    $carrier = strtolower( (string) $carrier );
+
+    $territory = lsrwc_detect_us_territory( $state, $zip, $country );
+    if ( $territory === '' ) {
+        return array(
+            'city'    => $city,
+            'state'   => $state,
+            'zip'     => $zip,
+            'country' => $country ?: 'US',
+        );
+    }
+
+    if ( $carrier === 'ups' ) {
+        return array(
+            'city'    => $city,
+            'state'   => $territory,
+            'zip'     => $zip,
+            'country' => $territory,
+        );
+    }
+
+    // usps / veeqo: domestic US with territory as state.
+    return array(
+        'city'    => $city,
+        'state'   => $territory,
+        'zip'     => $zip,
+        'country' => 'US',
+    );
+}
+
+/**
+ * Add US territories to the United States state list so checkout can use US → PR.
+ *
+ * @param array $states WooCommerce states keyed by country.
+ * @return array
+ */
+function lsrwc_add_us_territory_states( $states ) {
+    if ( ! isset( $states['US'] ) || ! is_array( $states['US'] ) ) {
+        $states['US'] = array();
+    }
+    foreach ( lsrwc_get_us_territory_codes() as $code => $label ) {
+        if ( ! isset( $states['US'][ $code ] ) ) {
+            $states['US'][ $code ] = $label;
+        }
+    }
+    return $states;
+}
 
 // Enqueue scripts and styles
 function lsrwc_enqueue_scripts( $hook ) {
@@ -762,7 +894,7 @@ function lsrwc_test_rates_ajax() {
     } else {
         // For US, test UPS Ground and USPS
         $rates['ups'] = lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length, $width, $height, '03' );
-        $rates['usps'] = lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack );
+        $rates['usps'] = lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack, $country );
     }
 
     if ( $debug_mode ) {
@@ -832,6 +964,18 @@ function lsrwc_fetch_ups_rates( $city, $state, $zip, $country, $weight, $length,
     $settings = get_option( 'lsrwc_settings', array() );
     $debug_mode = $settings['debug_mode'] ?? 0;
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    // Normalize US territories (e.g. WooCommerce country=PR → UPS CountryCode=PR, State=PR).
+    $destination = lsrwc_normalize_destination_for_carrier( $city, $state, $zip, $country, 'ups' );
+    $city        = $destination['city'];
+    $state       = $destination['state'];
+    $zip         = $destination['zip'];
+    $country     = $destination['country'];
+    if ( $debug_mode && lsrwc_detect_us_territory( $state, $zip, $country ) ) {
+        $debug_info['ups_territory_normalize'] = "Normalized UPS destination: City=$city, State=$state, ZIP=$zip, Country=$country";
+        set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+        lsrwc_log( "UPS territory normalize: City=$city, State=$state, ZIP=$zip, Country=$country" );
+    }
 
     // When Veeqo is the selected rate source, pull UPS Ground from Veeqo (Amazon
     // Shipping) for domestic shipments. Veeqo rate shopping is US domestic only, so
@@ -1261,10 +1405,22 @@ function lsrwc_fetch_usps_rates_single( $token, $body, $debug_mode = false ) {
 }
 
 // Fetch USPS rates
-function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack = false ) {
+function lsrwc_fetch_usps_rates( $city, $state, $zip, $weight, $length, $width, $height, $is_soft_pack = false, $country = 'US' ) {
     $settings = get_option( 'lsrwc_settings', array() );
     $debug_mode = $settings['debug_mode'] ?? 0;
     $debug_info = get_transient( 'lsrwc_debug_info' ) ?: array();
+
+    // Normalize US territories for domestic USPS quoting (Country=US, State=PR, etc.).
+    $destination = lsrwc_normalize_destination_for_carrier( $city, $state, $zip, $country, 'usps' );
+    $city        = $destination['city'];
+    $state       = $destination['state'];
+    $zip         = $destination['zip'];
+    $country     = $destination['country'];
+    if ( $debug_mode && lsrwc_detect_us_territory( $state, $zip, $country ) ) {
+        $debug_info['usps_territory_normalize'] = "Normalized USPS destination: City=$city, State=$state, ZIP=$zip, Country=$country";
+        set_transient( 'lsrwc_debug_info', $debug_info, HOUR_IN_SECONDS );
+        lsrwc_log( "USPS territory normalize: City=$city, State=$state, ZIP=$zip, Country=$country" );
+    }
 
     // When Veeqo is the selected rate source, pull USPS Ground Advantage from Veeqo
     // (Amazon Shipping) instead of the direct USPS API.
@@ -1482,6 +1638,14 @@ function lsrwc_fetch_veeqo_quotes( $city, $state, $zip, $country, $weight, $leng
     }
 
     $country = $country ?: 'US';
+    // Veeqo/Amazon rate shopping expects domestic US formatting for territories
+    // (Country=US, State=PR) even when WooCommerce stored country as PR.
+    $destination = lsrwc_normalize_destination_for_carrier( $city, $state, $zip, $country, 'veeqo' );
+    $city        = $destination['city'];
+    $state       = $destination['state'];
+    $zip         = $destination['zip'];
+    $country     = $destination['country'];
+
     $cache_key = md5( implode( '|', array( $city, $state, $zip, $country, $weight, $length, $width, $height ) ) );
     if ( isset( $cache[ $cache_key ] ) ) {
         return $cache[ $cache_key ];
@@ -2015,6 +2179,12 @@ function lsrwc_filter_shipping_methods( $rates, $package ) {
 
     // Check for Canada first
     $destination_country = $package['destination']['country'] ?? 'US';
+    $destination_state   = $package['destination']['state'] ?? '';
+    $destination_zip     = $package['destination']['postcode'] ?? '';
+    // US territories (PR, GU, VI, …) must use domestic UPS/USPS methods, not international.
+    if ( lsrwc_detect_us_territory( $destination_state, $destination_zip, $destination_country ) !== '' ) {
+        $destination_country = 'US';
+    }
     if ( $destination_country === 'CA' ) {
         // For Canada, only keep UPS International rates
         $filtered_rates = array();

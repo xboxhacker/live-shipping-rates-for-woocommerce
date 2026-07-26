@@ -12,7 +12,7 @@
 **Requires PHP:** 7.4  
 **WC requires at least:** 7.0  
 **WC tested up to:** 10.9  
-**Stable tag:** 1.4.0  
+**Stable tag:** 1.4.1  
 **License:** GPL v2 or later  
 **License URI:** https://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -365,6 +365,10 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 
 ## Changelog
 
+### 1.4.1 - July 26, 2026
+- **US territories (Puerto Rico, etc.) treated as domestic**: WooCommerce lists Puerto Rico as country `PR`, but USPS expects `US` + state `PR`. The plugin now normalizes PR/GU/VI/AS/MP for carrier rate requests (USPS/Veeqo → US+state; UPS → territory country code + state) so Ground Advantage and Ground quotes return for territory addresses.
+- Adds those territories to the United States state dropdown at checkout (`woocommerce_states`), matching the common functions.php workaround for USPS shipping to US territories.
+
 ### 1.4.0 - July 8, 2026
 - **New rate source: Veeqo (Amazon Shipping)**. Added a **Use Veeqo (Amazon) Rates** checkbox and a **Veeqo API Key** field in settings. When enabled, UPS and USPS live quotes are pulled from your Veeqo account's Amazon-negotiated rates (via the Veeqo Rate Shopping API, `POST /shipping/api/v1/rates`) instead of the direct UPS/USPS APIs, so cart quotes match the rates you actually pay when buying labels in Veeqo. The plugin picks the lowest USPS Ground Advantage quote and the lowest UPS Ground quote and applies your existing percentage markups.
 - Leaving the checkbox unchecked keeps the original direct UPS/USPS API behavior unchanged. Veeqo rate shopping is US domestic only; international/Canada UPS quotes always use the direct UPS API.
@@ -422,6 +426,9 @@ A: Create shipping class with configured free shipping slug, or use WooCommerce 
 - Comprehensive debugging and logging system
 
 ## Upgrade Notice
+
+### 1.4.1
+Fixes missing live rates to Puerto Rico and other US territories. USPS/Veeqo now quote them as domestic US (state PR, etc.), and UPS receives the correct territory country code.
 
 ### 1.4.0
 Adds an optional Veeqo (Amazon Shipping) rate source. Check "Use Veeqo (Amazon) Rates" and enter your Veeqo API key to quote the same Amazon-negotiated UPS/USPS rates you pay in Veeqo. Leave it unchecked to keep using the direct UPS/USPS APIs.
